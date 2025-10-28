@@ -19,6 +19,7 @@ public class Leaderboard : MonoBehaviour
     [Space]
     public TMPro.TextMeshProUGUI []scoreTexts;
     public TMPro.TextMeshProUGUI[] nameTexts;
+    public TMPro.TextMeshProUGUI[] kdTexts;
 
     private void Start()
     {
@@ -46,6 +47,15 @@ public class Leaderboard : MonoBehaviour
             nameTexts[i].text = player.NickName;
             scoreTexts[i].text = player.GetScore().ToString();
 
+            if (player.CustomProperties["Kills"] != null)
+            {
+                kdTexts[i].text = player.CustomProperties["Kills"] + "/" + player.CustomProperties["Deaths"];
+            }
+            else
+            {
+                kdTexts[i].text = "0/0";
+            }
+
             i++;
         }
     }
@@ -55,4 +65,3 @@ public class Leaderboard : MonoBehaviour
         playerHolder.SetActive(Input.GetKey(KeyCode.Tab));
     }
 }
-

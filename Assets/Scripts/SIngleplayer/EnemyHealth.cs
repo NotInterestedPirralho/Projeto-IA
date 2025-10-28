@@ -46,8 +46,8 @@ public class EnemyHealth : MonoBehaviourPunCallbacks
                     CombatSystem2D attackerCombat = attackerView.GetComponent<CombatSystem2D>();
                     if (attackerCombat != null)
                     {
-                        // Dá pontos por kill
-                        attackerView.RPC(nameof(CombatSystem2D.RegisterKill), attackerView.Owner);
+                        // Notifica o atacante que matou
+                        attackerView.RPC(nameof(CombatSystem2D.KillConfirmed), attackerView.Owner);
                     }
                 }
             }

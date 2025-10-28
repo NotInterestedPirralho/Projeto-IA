@@ -1,6 +1,7 @@
 using UnityEngine;
 using Photon.Pun;
 using TMPro;
+using ExitGames.Client.Photon;
 
 public class Health : MonoBehaviourPunCallbacks
 {
@@ -17,10 +18,10 @@ public class Health : MonoBehaviourPunCallbacks
             healthText.text = health.ToString();
     }
 
-    // Agora o TakeDamage recebe também o ID de quem causou o dano
     [PunRPC]
     public void TakeDamage(int _damage, int attackerViewID = -1)
     {
+        // Aplica o dano
         health -= _damage;
 
         if (healthText != null)
@@ -28,34 +29,43 @@ public class Health : MonoBehaviourPunCallbacks
 
         Debug.Log($"{gameObject.name} recebeu {_damage} de dano. Vida restante: {health}");
 
-        // Se a vida chegou a zero
+        // Verifica se morreu
         if (health <= 0)
         {
             Debug.Log($"{gameObject.name} morreu!");
 
-            // Se sou local, respawn
-            if (isLocalPlayer && RoomManager.instance != null)
-                RoomManager.instance.RespawnPlayer();
-
-            // Se há um atacante válido, atribui o kill
-            if (attackerViewID != -1)
+            // Atualiza apenas no dono local do jogador morto
+            if (photonView.IsMine)
             {
-                PhotonView attackerView = PhotonView.Find(attackerViewID);
-                if (attackerView != null)
+                // Respawn e contagem de mortes locais
+                if (RoomManager.instance != null)
                 {
-                    CombatSystem2D attackerCombat = attackerView.GetComponent<CombatSystem2D>();
-                    if (attackerCombat != null)
+                    RoomManager.instance.RespawnPlayer();
+                    RoomManager.instance.deaths++;
+                    RoomManager.instance.SetMashes();
+                }
+
+                // Atualiza estatísticas globais (Deaths) no Photon
+                ExitGames.Client.Photon.Hashtable hash = PhotonNetwork.LocalPlayer.CustomProperties;
+                int currentDeaths = 0;
+                if (hash.ContainsKey("Deaths")) currentDeaths = (int)hash["Deaths"];
+                hash["Deaths"] = currentDeaths + 1;
+                PhotonNetwork.LocalPlayer.SetCustomProperties(hash);
+
+                // Só o dono do objeto morto envia o RPC de kill ao atacante
+                if (attackerViewID != -1)
+                {
+                    PhotonView attackerView = PhotonView.Find(attackerViewID);
+                    if (attackerView != null)
                     {
-                        // Dá pontos por kill
-                        attackerView.RPC(nameof(CombatSystem2D.RegisterKill), attackerView.Owner);
+                        attackerView.RPC(nameof(CombatSystem2D.KillConfirmed), attackerView.Owner);
+                        Debug.Log($"Kill confirmada para {attackerView.Owner.NickName}");
                     }
                 }
-            }
 
-            // Destroi o objeto morto (somente o dono o faz)
-            PhotonView view = GetComponent<PhotonView>();
-            if (view != null && view.IsMine)
+                // Destroi o objeto morto (somente o dono o faz)
                 PhotonNetwork.Destroy(gameObject);
+            }
         }
     }
 }

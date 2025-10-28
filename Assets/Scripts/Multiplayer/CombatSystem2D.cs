@@ -2,20 +2,21 @@ using UnityEngine;
 using Photon.Pun;
 using Photon.Pun.UtilityScripts;
 using System.Collections;
+using ExitGames.Client.Photon; // importante
 
 [RequireComponent(typeof(PhotonView))]
 public class CombatSystem2D : MonoBehaviourPunCallbacks
 {
     [Header("Ataque")]
-    public int damage;
-    public float attackRange;
-    public float attackCooldown;
+    public int damage = 25;
+    public float attackRange = 1f;
+    public float attackCooldown = 0.5f;
     public Transform attackPoint;
     public LayerMask enemyLayers;
 
     [Header("Defesa")]
-    public float defenseDuration;
-    public float defenseCooldown;
+    public float defenseDuration = 1f;
+    public float defenseCooldown = 2f;
     public bool isDefending = false;
 
     [Header("VFX")]
@@ -37,14 +38,14 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     {
         if (!photonView.IsMine) return;
 
-        // ATAQUE — Botão esquerdo do rato
+        // ATAQUE — botão esquerdo do rato
         if (Input.GetMouseButtonDown(0) && Time.time >= nextAttackTime && !isDefending)
         {
             nextAttackTime = Time.time + attackCooldown;
             photonView.RPC(nameof(Attack), RpcTarget.All);
         }
 
-        // DEFESA — Botão direito do rato
+        // DEFESA — botão direito do rato
         if (Input.GetMouseButtonDown(1) && Time.time >= nextDefenseTime && !isDefending)
         {
             nextDefenseTime = Time.time + defenseCooldown;
@@ -57,12 +58,14 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     {
         if (anim) anim.SetTrigger("Attack");
 
+        // Cria o efeito visual do ataque
         if (hitVFX != null && attackPoint != null && photonView.IsMine)
         {
             GameObject vfx = PhotonNetwork.Instantiate(hitVFX.name, attackPoint.position, Quaternion.identity);
             StartCoroutine(DestroyVFX(vfx, 1f));
         }
 
+        // Detecta inimigos dentro da área de ataque
         Collider2D[] hitEnemies = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, enemyLayers);
 
         foreach (Collider2D enemy in hitEnemies)
@@ -74,7 +77,7 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
             CombatSystem2D targetCombat = enemy.GetComponent<CombatSystem2D>();
             Health targetHealth = enemy.GetComponent<Health>();
 
-            if (targetView != null && targetView.ViewID != photonView.ViewID)
+            if (targetView != null && targetView.ViewID != photonView.ViewID && targetHealth != null)
             {
                 bool enemyDefending = (targetCombat != null && targetCombat.isDefending);
                 int finalDamage = enemyDefending ? damage / 4 : damage;
@@ -82,18 +85,42 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
                 // Envia dano ao inimigo
                 targetView.RPC(nameof(Health.TakeDamage), RpcTarget.All, finalDamage, photonView.ViewID);
 
-                // Adiciona score conforme o tipo de dano
+                // Pontos imediatos por dano
                 if (photonView.IsMine)
                 {
-                    if (enemyDefending)
-                        PhotonNetwork.LocalPlayer.AddScore(finalDamage / 2); // defesa parcial
-                    else
-                        PhotonNetwork.LocalPlayer.AddScore(finalDamage); // dano total
+                    PhotonNetwork.LocalPlayer.AddScore(finalDamage);
+                    if (RoomManager.instance != null)
+                        RoomManager.instance.SetMashes();
                 }
-                
+
                 Debug.Log($"{gameObject.name} acertou {enemy.name} com {finalDamage} de dano!");
             }
         }
+    }
+
+    [PunRPC]
+    public void KillConfirmed()
+    {
+        if (!photonView.IsMine) return;
+
+        // Ganha pontos por kill
+        PhotonNetwork.LocalPlayer.AddScore(100);
+
+        // Atualiza RoomManager
+        if (RoomManager.instance != null)
+        {
+            RoomManager.instance.kills++;
+            RoomManager.instance.SetMashes();
+        }
+
+        // Atualiza CustomProperties (Kills)
+        ExitGames.Client.Photon.Hashtable hash = PhotonNetwork.LocalPlayer.CustomProperties;
+        int currentKills = 0;
+        if (hash.ContainsKey("Kills")) currentKills = (int)hash["Kills"];
+        hash["Kills"] = currentKills + 1;
+        PhotonNetwork.LocalPlayer.SetCustomProperties(hash);
+
+        Debug.Log($"{gameObject.name} matou um inimigo! +100 pontos e +1 kill");
     }
 
     private IEnumerator DestroyVFX(GameObject vfx, float delay)
@@ -122,17 +149,6 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
         isDefending = true;
         yield return new WaitForSeconds(defenseDuration);
         isDefending = false;
-    }
-
-    // Chamada quando o jogador mata outro
-    [PunRPC]
-    public void RegisterKill()
-    {
-        if (photonView.IsMine)
-        {
-            PhotonNetwork.LocalPlayer.AddScore(100); // Pontos por kill
-            Debug.Log($"{gameObject.name} ganhou 100 pontos por kill!");
-        }
     }
 
     void OnDrawGizmosSelected()
