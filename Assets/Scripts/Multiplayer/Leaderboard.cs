@@ -1,3 +1,4 @@
+
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -14,10 +15,10 @@ public class Leaderboard : MonoBehaviour
     public float refreshRate = 1f;
 
     [Header("UI")]
-    public GameObject []slots;
+    public GameObject[] slots;
 
     [Space]
-    public TMPro.TextMeshProUGUI []scoreTexts;
+    public TMPro.TextMeshProUGUI[] scoreTexts;
     public TMPro.TextMeshProUGUI[] nameTexts;
     public TMPro.TextMeshProUGUI[] kdTexts;
 
@@ -33,7 +34,7 @@ public class Leaderboard : MonoBehaviour
             slot.SetActive(false);
         }
 
-        var slotedPlayerList = 
+        var slotedPlayerList =
             (from player in PhotonNetwork.PlayerList orderby player.GetScore() descending select player).ToList();
 
         int i = 0;
@@ -48,21 +49,21 @@ public class Leaderboard : MonoBehaviour
             scoreTexts[i].text = player.GetScore().ToString();
 
             // Pega as Kills, ou 0 se não existir
-            int kills = 0;
+            int kills = 0;
             if (player.CustomProperties.ContainsKey("Kills"))
             {
                 kills = (int)player.CustomProperties["Kills"];
             }
 
-            // Pega as Deaths, ou 0 se não existir
-            int deaths = 0;
+            // Pega as Deaths, ou 0 se não existir
+            int deaths = 0;
             if (player.CustomProperties.ContainsKey("Deaths"))
             {
                 deaths = (int)player.CustomProperties["Deaths"];
             }
 
-            // Mostra os valores
-            kdTexts[i].text = kills + "/" + deaths;
+            // Mostra os valores
+            kdTexts[i].text = kills + "/" + deaths;
 
             i++;
         }
