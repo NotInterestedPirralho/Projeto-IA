@@ -3,65 +3,21 @@ using UnityEngine.SceneManagement;
 
 public class MenuController : MonoBehaviour
 {
-    [Header("Painéis")]
-    [SerializeField] private GameObject mainButtonsPanel;   // Painel com Play/Settings/Exit
-    [SerializeField] private GameObject playOptionsPanel;   // Painel com Multiplayer/Training
-
-    [Header("Nomes das cenas (exactos nas Build Settings)")]
-    [SerializeField] private string multiplayerSceneName = "Multiplayer";
-    [SerializeField] private string trainingSceneName = "TrainingGround";
-
-    private void Awake()
+    // Função chamada ao clicar no botão "Jogar"
+    public void StartGame()
     {
-        // Garante estados iniciais
-        if (mainButtonsPanel != null) mainButtonsPanel.SetActive(true);
-        if (playOptionsPanel != null) playOptionsPanel.SetActive(false);
+        SceneManager.LoadScene("MainScene");
+        // Confirma que "MainScene" é exatamente o nome da tua cena de jogo
     }
 
-    // ---------- Botões do menu principal ----------
-    public void OnPlayPressed()
-    {
-        TogglePanels(false, true); // esconde principal, mostra submenu
-    }
-
+    // Função chamada ao clicar no botão "Sair"
     public void ExitGame()
     {
-        Application.Quit();
+        Application.Quit();  // Fecha o jogo na build final
+
+        // Para também parar o Play Mode dentro do Unity Editor
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #endif
-    }
-
-    // ---------- Botões do submenu (Play Options) ----------
-    public void OnBackPressed()
-    {
-        TogglePanels(true, false); // volta ao menu principal
-    }
-
-    public void OnMultiplayerPressed()
-    {
-        LoadSceneSafe(multiplayerSceneName);
-    }
-
-    public void OnTrainingPressed()
-    {
-        LoadSceneSafe(trainingSceneName);
-    }
-
-    // ---------- Utilitários ----------
-    private void TogglePanels(bool showMain, bool showPlayOptions)
-    {
-        if (mainButtonsPanel != null) mainButtonsPanel.SetActive(showMain);
-        if (playOptionsPanel != null) playOptionsPanel.SetActive(showPlayOptions);
-    }
-
-    private void LoadSceneSafe(string sceneName)
-    {
-        if (string.IsNullOrEmpty(sceneName))
-        {
-            Debug.LogError("Nome da cena não está definido no Inspector!");
-            return;
-        }
-        SceneManager.LoadScene(sceneName);
     }
 }
