@@ -16,25 +16,33 @@ public class Movement2D : MonoBehaviour
     public float groundCheckDistance;
     public LayerMask groundLayer;
 
-    [Header("Knockback")] // Novo Header
-    public bool isKnockedBack = false; // Flag para desativar o controle
+    [Header("Knockback")]
+    public bool isKnockedBack = false; // Flag para desativar o controlo
+
+    [Header("Ataque (opcional)")]
+    public Transform attackPoint; // Para sincronizar o lado do ataque com o personagem
 
     private Rigidbody2D rb;
     private bool sprinting;
     private bool grounded;
     private int jumpCount;
+
     private CombatSystem2D combatSystem;
+    private Animator anim;
+    private SpriteRenderer spriteRenderer;
 
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         combatSystem = GetComponent<CombatSystem2D>();
+        anim = GetComponent<Animator>();
+        spriteRenderer = GetComponent<SpriteRenderer>();
 
         if (groundCheck == null)
             Debug.LogWarning("GroundCheck não atribuído no inspector!");
     }
 
-    // Método público para ser chamado pelo Health.cs
+    // Chamado pelo Health.cs quando levas knockback
     public void SetKnockbackState(bool state)
     {
         isKnockedBack = state;
@@ -42,41 +50,83 @@ public class Movement2D : MonoBehaviour
 
     void Update()
     {
-        // Se estiver a sofrer knockback, ignora todos os inputs de movimento.
+        float move = 0f; // valor de input horizontal para o Animator
+
+        // 1) Atualizar chão SEMPRE (mesmo a defender ou em knockback)
+        if (groundCheck != null)
+        {
+            grounded = Physics2D.Raycast(
+                groundCheck.position,
+                Vector2.down,
+                groundCheckDistance,
+                groundLayer
+            );
+        }
+
+        if (grounded)
+            jumpCount = 0;
+
+        // 2) Se estiver em knockback, não lê inputs, só deixa cair
         if (isKnockedBack)
         {
+            if (anim)
+            {
+                anim.SetFloat("Speed", 0f);
+                anim.SetBool("Grounded", grounded);
+            }
             return;
         }
 
-        // Se estiver a defender, para o movimento horizontal e ignora o resto da função.
-        if (combatSystem != null && combatSystem.isDefending)
+        bool isDefending = (combatSystem != null && combatSystem.isDefending);
+
+        // 3) Se NÃO estiver a defender → movimento normal + salto
+        if (!isDefending)
         {
-            // Força a paragem horizontal (mas deixa a gravidade atuar)
+            // Movimento horizontal
+            move = Input.GetAxis("Horizontal");
+            sprinting = Input.GetKey(KeyCode.LeftShift);
+            float speed = sprinting ? sprintSpeed : walkSpeed;
+            rb.linearVelocity = new Vector2(move * speed, rb.linearVelocity.y);
+
+            // Flip do sprite conforme o lado
+            if (spriteRenderer != null)
+            {
+                if (move > 0.05f)
+                    spriteRenderer.flipX = false; // direita
+                else if (move < -0.05f)
+                    spriteRenderer.flipX = true;  // esquerda
+            }
+
+            // Manter o ponto de ataque do lado certo
+            if (attackPoint != null && spriteRenderer != null)
+            {
+                float attackX = Mathf.Abs(attackPoint.localPosition.x);
+                attackPoint.localPosition = new Vector3(
+                    spriteRenderer.flipX ? -attackX : attackX,
+                    attackPoint.localPosition.y,
+                    attackPoint.localPosition.z
+                );
+            }
+
+            // Salto com W
+            if (Input.GetKeyDown(KeyCode.W) && jumpCount < maxJumps)
+            {
+                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+                jumpCount++;
+            }
+        }
+        else
+        {
+            // 4) A defender → NÃO anda nem salta, mas pode cair normalmente
             rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
-            return; // Impede a leitura de inputs de movimento e pulo
+            move = 0f; // para o Animator ficar em Idle/Defend
         }
 
-
-        // Movimento horizontal
-        float move = Input.GetAxis("Horizontal");
-        sprinting = Input.GetKey(KeyCode.LeftShift);
-        float speed = sprinting ? sprintSpeed : walkSpeed;
-        rb.linearVelocity = new Vector2(move * speed, rb.linearVelocity.y);
-
-        // Checar chão com raycast
-        grounded = Physics2D.Raycast(groundCheck.position, Vector2.down, groundCheckDistance, groundLayer);
-
-        // Reset de jumps ao tocar no chão
-        if (grounded)
+        // 5) Atualizar Animator
+        if (anim)
         {
-            jumpCount = 0;
-        }
-
-        // Salto com W
-        if (Input.GetKeyDown(KeyCode.W) && jumpCount < maxJumps)
-        {
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-            jumpCount++;
+            anim.SetFloat("Speed", Mathf.Abs(move));
+            anim.SetBool("Grounded", grounded);
         }
     }
 
