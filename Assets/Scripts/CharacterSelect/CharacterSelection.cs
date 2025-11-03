@@ -2,22 +2,26 @@ using UnityEngine;
 
 public class CharacterSelection : MonoBehaviour
 {
-    public static CharacterSelection Instance;
+    public static CharacterSelection Instance { get; private set; }
 
-    public string selectedPrefabName; // ex: "SoldierPlayer", "ChefPlayer"
+    // nome do prefab em Resources (Soldier, Chef, Thief...)
+    public string selectedCharacterName = "Soldier"; // default
 
-    void Awake()
+    private void Awake()
     {
-        if (Instance != null) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
         DontDestroyOnLoad(gameObject);
-
-        selectedPrefabName = PlayerPrefs.GetString("selectedCharacter", "SoldierPlayer");
     }
 
-    public void Choose(string prefabName)
+    public void SelectCharacter(string prefabName)
     {
-        selectedPrefabName = prefabName;
-        PlayerPrefs.SetString("selectedCharacter", prefabName);
+        selectedCharacterName = prefabName;
+        Debug.Log($"[CharacterSelection] Personagem escolhido: {selectedCharacterName}");
     }
 }
