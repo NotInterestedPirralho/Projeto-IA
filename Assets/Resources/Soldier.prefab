@@ -163,8 +163,8 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.0027448654, y: -0.004199696}
-  m_Size: {x: 0.17103854, y: 0.2195138}
+  m_Offset: {x: 0.0043580295, y: 0.00010198355}
+  m_Size: {x: 0.16781221, y: 0.20445788}
   m_Direction: 0
 --- !u!114 &788247720233381919
 MonoBehaviour:
@@ -365,6 +365,7 @@ GameObject:
   - component: {fileID: 4068706421402968956}
   - component: {fileID: 1054786633558987952}
   - component: {fileID: 4680205657692814750}
+  - component: {fileID: 3476518092207864202}
   m_Layer: 0
   m_Name: Camera
   m_TagString: MainCamera
@@ -491,6 +492,22 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+--- !u!114 &3476518092207864202
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2230336388305368168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 185e4880118c30f45814101392df96d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cam: {fileID: 0}
+  startSize: 10
+  targetSize: 5
+  duration: 2
 --- !u!1 &2480449986994863222
 GameObject:
   m_ObjectHideFlags: 0
@@ -557,8 +574,8 @@ CircleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.007457435, y: 0.43689963}
-  m_Radius: 0.071800664
+  m_Offset: {x: 0.007457435, y: 0.4401259}
+  m_Radius: 0.068574384
 --- !u!1 &3010875529657053083
 GameObject:
   m_ObjectHideFlags: 0
@@ -1054,8 +1071,8 @@ CapsuleCollider2D:
   m_UsedByEffector: 0
   m_CompositeOperation: 0
   m_CompositeOrder: 0
-  m_Offset: {x: 0.0017962046, y: -0.0014567261}
-  m_Size: {x: 0.08001157, y: 0.10505968}
+  m_Offset: {x: 0.009272407, y: 0.0013276208}
+  m_Size: {x: 0.09353994, y: 0.09353994}
   m_Direction: 0
 --- !u!1 &8863698398874018611
 GameObject:

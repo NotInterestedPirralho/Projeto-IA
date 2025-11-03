@@ -390,7 +390,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: de36d99b24e97ad4bbeef77d4a232489, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  player: {fileID: 61911978259195691, guid: cd1776699e7303a4d8fd3bcc0063242e, type: 3}
+  player: {fileID: 61911978259195691, guid: 833b426e95105e846b18f0dfbc670e8c, type: 3}
   spawnPoints:
   - {fileID: 1111065849}
   - {fileID: 206189131}
