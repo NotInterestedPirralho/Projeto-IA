@@ -20,6 +20,7 @@ GameObject:
   - component: {fileID: 3538730646336838822}
   - component: {fileID: 3533807659994901797}
   - component: {fileID: 5797720257916456991}
+  - component: {fileID: 8044158714304478890}
   m_Layer: 7
   m_Name: Chef
   m_TagString: Untagged
@@ -330,6 +331,28 @@ MonoBehaviour:
   knockbackForce: 10
   knockbackDuration: 0.2
   healthText: {fileID: 0}
+--- !u!95 &8044158714304478890
+Animator:
+  serializedVersion: 7
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 61911978259195691}
+  m_Enabled: 1
+  m_Avatar: {fileID: 0}
+  m_Controller: {fileID: 9100000, guid: a982859884d858b428408d4b793245a7, type: 2}
+  m_CullingMode: 0
+  m_UpdateMode: 0
+  m_ApplyRootMotion: 0
+  m_LinearVelocityBlending: 0
+  m_StabilizeFeet: 0
+  m_AnimatePhysics: 0
+  m_WarningMessage: 
+  m_HasTransformHierarchy: 1
+  m_AllowConstantClipSamplingOptimization: 1
+  m_KeepAnimatorStateOnDisable: 0
+  m_WriteDefaultValuesOnDisable: 0
 --- !u!1 &2230336388305368168
 GameObject:
   m_ObjectHideFlags: 0
@@ -342,6 +365,7 @@ GameObject:
   - component: {fileID: 4068706421402968956}
   - component: {fileID: 1054786633558987952}
   - component: {fileID: 4680205657692814750}
+  - component: {fileID: 2396188403604776006}
   m_Layer: 0
   m_Name: Camera
   m_TagString: MainCamera
@@ -468,6 +492,22 @@ MonoBehaviour:
     m_MipBias: 0
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
+--- !u!114 &2396188403604776006
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2230336388305368168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 185e4880118c30f45814101392df96d3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  cam: {fileID: 0}
+  startSize: 10
+  targetSize: 5
+  duration: 2
 --- !u!1 &2480449986994863222
 GameObject:
   m_ObjectHideFlags: 0
