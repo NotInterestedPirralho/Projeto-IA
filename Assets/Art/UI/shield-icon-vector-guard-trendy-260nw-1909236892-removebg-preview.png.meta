@@ -134,7 +134,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      shield-icon-vector-guard-trendy-260nw-1909236892-removebg-preview_0: -8926361255648614968
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
