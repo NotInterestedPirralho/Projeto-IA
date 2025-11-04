@@ -9,8 +9,8 @@ public class MenuController : MonoBehaviour
 
     [Header("Nomes das cenas (exactos nas Build Settings)")]
     [SerializeField] private string multiplayerSceneName = "Multiplayer";
+    [SerializeField] private string characterSelectSceneName = "CharacterSelect";
     [SerializeField] private string trainingSceneName = "TrainingGround";
-
     private void Awake()
     {
         // Garante estados iniciais
@@ -45,9 +45,9 @@ public class MenuController : MonoBehaviour
 
     public void OnTrainingPressed()
     {
-        LoadSceneSafe(trainingSceneName);
+        // Primeiro vai para a cena de seleção de personagem
+        LoadSceneSafe(characterSelectSceneName);
     }
-
     // ---------- Utilitários ----------
     private void TogglePanels(bool showMain, bool showPlayOptions)
     {
