@@ -217,7 +217,6 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   isKnockedBack: 0
-  attackPoint: {fileID: 0}
 --- !u!114 &3548697139772030856
 MonoBehaviour:
   m_ObjectHideFlags: 0
