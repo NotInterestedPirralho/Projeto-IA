@@ -3,19 +3,32 @@ using System.Collections.Generic;
 using UnityEngine;
 using Photon.Pun;
 
-// TGRoomManager should inherit from MonoBehaviourPunCallbacks to use Photon callback methods
 public class TGRoomManager : MonoBehaviourPunCallbacks
 {
     public static TGRoomManager instance;
 
-    [Header("Spawn")]
+    [Header("Player")]
+    public GameObject player;
     public Transform[] spawnPoints;
+
+    [Header("Enemy Setup")]
+    public GameObject enemyPrefab;
+    public Transform[] enemySpawnPoints;
+    public int enemyCount = 3;
+    public float enemyRespawnDelay = 5f;
 
     [Space]
     public GameObject tgRoomCam;
 
+    private List<GameObject> activeEnemies = new List<GameObject>();
+
     void Awake()
     {
+        if (instance != null)
+        {
+            Destroy(gameObject);
+            return;
+        }
         instance = this;
     }
 
@@ -39,10 +52,9 @@ public class TGRoomManager : MonoBehaviourPunCallbacks
     {
         base.OnJoinedLobby();
 
-        Debug.Log("Joined Training Ground Lobby");
+        Debug.Log("Joined Training Ground");
 
-        PhotonNetwork.JoinOrCreateRoom("TrainingGroundRoom",
-            new Photon.Realtime.RoomOptions { MaxPlayers = 1 }, null);
+        PhotonNetwork.JoinOrCreateRoom("TrainingGroundRoom", new Photon.Realtime.RoomOptions { MaxPlayers = 1 }, null);
     }
 
     public override void OnJoinedRoom()
@@ -53,35 +65,76 @@ public class TGRoomManager : MonoBehaviourPunCallbacks
 
         tgRoomCam.SetActive(false);
 
+        // Player
         RespawnPlayer();
+
+        // Enemy
+        if (PhotonNetwork.IsMasterClient)
+        {
+            SpawnInitialEnemies();
+        }
     }
+
+    // --- Player Spawn ---
 
     public void RespawnPlayer()
     {
-        Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
+        Transform spawnPoint = spawnPoints[UnityEngine.Random.Range(0, spawnPoints.Length)];
 
-        string prefabName = "Soldier"; // default
+        GameObject _player = PhotonNetwork.Instantiate(player.name, spawnPoint.position, Quaternion.identity);
+        _player.GetComponent<PlayerSetup>().IsLocalPlayer();
+        _player.GetComponent<Health>().isLocalPlayer = true;
+    }
 
-        if (CharacterSelection.Instance != null &&
-            !string.IsNullOrEmpty(CharacterSelection.Instance.selectedPrefabName))
+    // --- Enemy Spawn ---
+    private void SpawnInitialEnemies()
+    {
+        activeEnemies.Clear();
+
+        for (int i = 0; i < enemyCount; i++)
         {
-            prefabName = CharacterSelection.Instance.selectedPrefabName;
+            Transform spawnPoint = enemySpawnPoints[i % enemySpawnPoints.Length];
+
+            SpawnSingleEnemy(spawnPoint.position);
         }
+        Debug.Log($"Master Client spawnou {enemyCount} inimigos.");
+    }
 
-        Debug.Log($"[TGRoomManager] Spawning prefab: {prefabName}");
+    private void SpawnSingleEnemy(Vector3 position)
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
 
-        GameObject _player = PhotonNetwork.Instantiate(
-            prefabName,
-            spawnPoint.position,
-            Quaternion.identity
-        );
+        if (enemyPrefab != null)
+        {
+            GameObject newEnemy = PhotonNetwork.Instantiate(enemyPrefab.name, position, Quaternion.identity);
 
-        PlayerSetup setup = _player.GetComponent<PlayerSetup>();
-        if (setup != null)
-            setup.IsLocalPlayer();
+            activeEnemies.Add(newEnemy);
+        }
+        else
+        {
+            Debug.LogError("Enemy Prefab não está atribuído no Room Manager!");
+        }
+    }
 
-        Health health = _player.GetComponent<Health>();
-        if (health != null)
-            health.isLocalPlayer = true;
+    public void RequestEnemyRespawn(Vector3 deathPosition)
+    {
+        if (!PhotonNetwork.IsMasterClient) return;
+
+        Debug.Log($"Inimigo foi destruído. Respawn agendado em {enemyRespawnDelay} segundos.");
+
+        Transform spawnPoint = enemySpawnPoints[UnityEngine.Random.Range(0, enemySpawnPoints.Length)];
+
+        StartCoroutine(EnemyRespawnRoutine(enemyRespawnDelay, spawnPoint.position));
+    }
+
+    private IEnumerator EnemyRespawnRoutine(float delay, Vector3 position)
+    {
+        yield return new WaitForSeconds(delay);
+
+        if (PhotonNetwork.IsMasterClient)
+        {
+            SpawnSingleEnemy(position);
+            Debug.Log("Inimigo respawnado.");
+        }
     }
 }

@@ -86,8 +86,18 @@ public class Health : MonoBehaviourPunCallbacks
             PhotonView attackerView = PhotonView.Find(attackerViewID);
             if (attackerView != null)
             {
-                // Aplica o knockback usando a posição do atacante
-                ApplyKnockback(attackerView.transform.position);
+                // Se o atacante tiver um CombatSystem2D, assumimos que é um JOGADOR.
+                CombatSystem2D attackerCombat = attackerView.GetComponent<CombatSystem2D>();
+
+                // Se o atacante tiver um EnemyAI, assumimos que é um INIMIGO.
+                EnemyAI attackerAI = attackerView.GetComponent<EnemyAI>();
+
+                // Aplicar knockback se for um Jogador OU um Inimigo.
+                if (attackerCombat != null || attackerAI != null)
+                {
+                    // Aplica o knockback usando a posição do atacante
+                    ApplyKnockback(attackerView.transform.position);
+                }
             }
         }
         // ---------------------------------------------------------
@@ -119,9 +129,13 @@ public class Health : MonoBehaviourPunCallbacks
                     PhotonView attackerView = PhotonView.Find(attackerViewID);
                     if (attackerView != null)
                     {
+                        // Procura por CombatSystem2D (pois só o Player tem este script com KillConfirmed)
                         CombatSystem2D attackerCombat = attackerView.GetComponent<CombatSystem2D>();
                         if (attackerCombat != null)
                             attackerView.RPC(nameof(CombatSystem2D.KillConfirmed), attackerView.Owner);
+
+                        // NOTA: Se o atacante for um inimigo (EnemyAI), não tem KillConfirmed. 
+                        // Apenas jogadores pontuam kills.
                     }
                 }
             }

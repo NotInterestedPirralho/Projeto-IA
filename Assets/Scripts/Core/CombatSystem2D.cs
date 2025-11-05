@@ -1,12 +1,11 @@
-// CombatSystem2D.cs
 using UnityEngine;
 using Photon.Pun;
 using Photon.Pun.UtilityScripts;
 using System.Collections;
 using ExitGames.Client.Photon;
 using System.Collections.Generic;
-using UnityEngine.UI;      // <- NOVO (para Image)
-using TMPro;               // <- NOVO (para TextMeshPro)
+using UnityEngine.UI;              // NOVO: Necessário para a classe Image
+using TMPro;                       // NOVO: Necessário para TextMeshProUGUI
 
 [RequireComponent(typeof(PhotonView))]
 public class CombatSystem2D : MonoBehaviourPunCallbacks
@@ -25,18 +24,20 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     [Header("VFX")]
     public GameObject hitVFX;
 
+    // NOVO: Elementos de UI
     [Header("UI Defesa")]
-    public Image defenseIcon;            // Ícone do shield
-    public TextMeshProUGUI defenseText; // Texto com o tempo
+    public Image defenseIcon;            // Ícone do shield (para alterar a transparência)
+    public TextMeshProUGUI defenseText; // Texto com o tempo restante
 
     private float nextAttackTime = 0f;
     private float nextDefenseTime = 0f;
     private Animator anim;
-
+    private PhotonView photonView;
 
     void Awake()
     {
-        // Continua igual: só é ativado no PlayerSetup para o jogador local
+        photonView = GetComponent<PhotonView>();
+        // Este script só deve rodar no jogador local para gerir os inputs e UI
         enabled = false;
     }
 
@@ -44,7 +45,7 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     {
         anim = GetComponent<Animator>();
 
-        // Tentativa de encontrar automaticamente os elementos de UI
+        // NOVO: Tentar encontrar UI automaticamente (útil para pré-fabs)
         if (defenseIcon == null || defenseText == null)
         {
             Canvas canvas = GetComponentInChildren<Canvas>();
@@ -61,52 +62,51 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
 
     void Update()
     {
-        // --- LÓGICA DE ATAQUE (igual ao teu) ---
+        // Lógica de Ataque (Input lido apenas no jogador local)
         if (Input.GetMouseButtonDown(0) && Time.time >= nextAttackTime && !isDefending)
         {
             nextAttackTime = Time.time + attackCooldown;
-            // Chama o RPC (todos veem a animação, mas só o atacante calcula o dano)
             photonView.RPC(nameof(Attack), RpcTarget.All);
         }
 
-        // --- LÓGICA DE DEFESA (igual à tua) ---
-
-        // Quando o jogador CARREGA no botão de defesa
+        // --- LÓGICA DE DEFESA ---
         if (Input.GetMouseButtonDown(1) && Time.time >= nextDefenseTime && !isDefending)
         {
-            // RPC para sincronizar o estado de defesa em todos
             photonView.RPC(nameof(SetDefenseState), RpcTarget.All, true);
         }
 
-        // Quando o jogador LARGA o botão de defesa
         if (Input.GetMouseButtonUp(1) && isDefending)
         {
-            // RPC para sincronizar o fim do estado de defesa
             photonView.RPC(nameof(SetDefenseState), RpcTarget.All, false);
             nextDefenseTime = Time.time + defenseCooldown;
         }
 
-        // --- ATUALIZAR UI DO COOLDOWN ---
+        // NOVO: Atualizar o estado visual do cooldown
         UpdateDefenseUI();
     }
 
-    // NOVO: Atualiza ícone + número do cooldown
+    // NOVO: Implementação do método de UI
     private void UpdateDefenseUI()
     {
+        // Só precisa de processar a UI se for o jogador local
+        if (!photonView.IsMine) return;
+
         if (defenseIcon == null && defenseText == null) return;
 
         float remaining = nextDefenseTime - Time.time;
 
-        // Em cooldown (e não está a defender)
+        // Está em cooldown (após largar a defesa)
         if (remaining > 0f && !isDefending)
         {
+            // Diminui a opacidade do ícone para indicar "bloqueado"
             if (defenseIcon != null)
             {
                 var c = defenseIcon.color;
-                c.a = 0.5f; // mais transparente quando está em cooldown
+                c.a = 0.5f;
                 defenseIcon.color = c;
             }
 
+            // Mostra o tempo restante
             if (defenseText != null)
             {
                 int seconds = Mathf.CeilToInt(remaining);
@@ -115,25 +115,27 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
         }
         else
         {
-            // Cooldown pronto
+            // Cooldown pronto ou a defender
             if (defenseIcon != null)
             {
                 var c = defenseIcon.color;
-                c.a = 1f; // totalmente visível
+                c.a = 1f; // Volta a 100% de opacidade
                 defenseIcon.color = c;
             }
 
+            // Remove o número
             if (defenseText != null)
-                defenseText.text = ""; // limpa o número
+                defenseText.text = "";
         }
     }
+
 
     [PunRPC]
     void Attack()
     {
         if (anim) anim.SetTrigger("Attack");
 
-        // LÓGICA AUTORITÁRIA: Usa 'photonView.IsMine' para garantir que SÓ O ATACANTE (dono do view)
+        // LÓGICA AUTORITÁRIA
         if (photonView.IsMine)
         {
             // Instanciar VFX
@@ -151,19 +153,25 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
 
                 PhotonView targetView = enemy.GetComponent<PhotonView>();
                 CombatSystem2D targetCombat = enemy.GetComponent<CombatSystem2D>();
+
                 Health targetHealth = enemy.GetComponent<Health>();
+                EnemyHealth enemyHealth = enemy.GetComponent<EnemyHealth>();
 
-                if (targetView != null && targetView.ViewID != photonView.ViewID && targetHealth != null)
+                if (targetView != null && targetView.ViewID != photonView.ViewID && (targetHealth != null || enemyHealth != null))
                 {
-                    bool enemyDefending = (targetCombat != null && targetCombat.isDefending);
-                    int finalDamage = enemyDefending ? damage / 4 : damage;
+                    bool targetDefending = (targetCombat != null && targetCombat.isDefending);
+                    int finalDamage = targetDefending ? damage / 4 : damage;
 
-                    // Chama TakeDamage no alvo (Todos veem o dano)
-                    targetView.RPC(nameof(Health.TakeDamage), RpcTarget.All, finalDamage, photonView.ViewID);
+                    if (targetHealth != null)
+                    {
+                        targetView.RPC(nameof(Health.TakeDamage), RpcTarget.All, finalDamage, photonView.ViewID);
+                    }
+                    else if (enemyHealth != null)
+                    {
+                        targetView.RPC(nameof(EnemyHealth.TakeDamage), RpcTarget.All, finalDamage, photonView.ViewID);
+                    }
 
-                    // Adicionar pontuação pelo dano (Continua a pontuar pelo dano)
                     PhotonNetwork.LocalPlayer.AddScore(finalDamage);
-
                     Debug.Log($"{gameObject.name} acertou {enemy.name} com {finalDamage} de dano!");
                 }
             }
@@ -173,8 +181,6 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     [PunRPC]
     public void KillConfirmed()
     {
-        // Usa 'photonView.IsMine' para garantir que só o jogador que fez a Kill
-        // atualiza o score e CustomProperties.
         if (!photonView.IsMine) return;
 
         int currentKills = 0;
@@ -185,7 +191,7 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
         ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable { { "Kills", currentKills } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
 
-        Debug.Log($"{gameObject.name} matou um inimigo! +1 kill (Sem pontos bónus)");
+        Debug.Log($"{gameObject.name} matou um inimigo! +1 kill.");
     }
 
     private IEnumerator DestroyVFX(GameObject vfx, float delay)
@@ -194,7 +200,6 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
         if (vfx != null)
         {
             PhotonView vfxView = vfx.GetComponent<PhotonView>();
-            // O atacante (IsMine) é o dono do VFX e deve destruí-lo
             if (vfxView != null && vfxView.IsMine)
                 PhotonNetwork.Destroy(vfx);
             else if (vfxView == null)
@@ -205,7 +210,6 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     [PunRPC]
     void SetDefenseState(bool state)
     {
-        // Sincroniza o estado de defesa em todos os clientes
         isDefending = state;
 
         if (state)
