@@ -79,11 +79,31 @@ public class TGRoomManager : MonoBehaviourPunCallbacks
 
     public void RespawnPlayer()
     {
-        Transform spawnPoint = spawnPoints[UnityEngine.Random.Range(0, spawnPoints.Length)];
+        Transform spawnPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
 
-        GameObject _player = PhotonNetwork.Instantiate(player.name, spawnPoint.position, Quaternion.identity);
-        _player.GetComponent<PlayerSetup>().IsLocalPlayer();
-        _player.GetComponent<Health>().isLocalPlayer = true;
+        string prefabName = "Soldier"; // default
+
+        if (CharacterSelection.Instance != null &&
+            !string.IsNullOrEmpty(CharacterSelection.Instance.selectedPrefabName))
+        {
+            prefabName = CharacterSelection.Instance.selectedPrefabName;
+        }
+
+        Debug.Log($"[TGRoomManager] Spawning prefab: {prefabName}");
+
+        GameObject _player = PhotonNetwork.Instantiate(
+            prefabName,
+            spawnPoint.position,
+            Quaternion.identity
+        );
+
+        PlayerSetup setup = _player.GetComponent<PlayerSetup>();
+        if (setup != null)
+            setup.IsLocalPlayer();
+
+        Health health = _player.GetComponent<Health>();
+        if (health != null)
+            health.isLocalPlayer = true;
     }
 
     // --- Enemy Spawn ---
