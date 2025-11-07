@@ -42,7 +42,7 @@ public class Leaderboard : MonoBehaviour
             slots[i].SetActive(true);
 
             if (player.NickName == "")
-                player.NickName = "Nameless" + player.ActorNumber;
+                player.NickName = "Player" + player.ActorNumber;
 
             nameTexts[i].text = player.NickName;
             scoreTexts[i].text = player.GetScore().ToString();

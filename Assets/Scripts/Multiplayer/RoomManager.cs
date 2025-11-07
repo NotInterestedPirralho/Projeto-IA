@@ -1,4 +1,3 @@
-//roomManager.cs
 using UnityEngine;
 using Photon.Pun;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
@@ -20,8 +19,6 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [Space]
     public GameObject nameUI;
     public GameObject connectigUI;
-
-    // <-- CORRECAO: Variáveis 'kills' e 'deaths' removidas 
 
     public string roomNameToJoin = "Noname";
 
@@ -67,6 +64,4 @@ public class RoomManager : MonoBehaviourPunCallbacks
         _player.GetComponent<PhotonView>().RPC("SetNickname", RpcTarget.AllBuffered, nickName);
         PhotonNetwork.LocalPlayer.NickName = nickName;
     }
-
-    // <-- CORRECAO: Metodo SetMashes() removido
 }

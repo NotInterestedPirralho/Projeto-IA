@@ -56,6 +56,6 @@ public class GameChat : MonoBehaviour
     [PunRPC]
     public void SendChatMessage(string _message)
     {
-        chatText.text = chatText + "\n" + _message;
+        chatText.text = chatText.text + "\n" + _message;
     }
 }
