@@ -1,11 +1,18 @@
 using UnityEngine;
 using Photon.Pun;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
-using TMPro; // NECESSÁRIO para o componente de texto
+using Photon.Realtime;
+using UnityEngine.SceneManagement;
 
 public class RoomManager : MonoBehaviourPunCallbacks
 {
     public static RoomManager instance;
+
+    // Constante para o número máximo de respawns (vidas)
+    private const int MAX_RESPAWNS = 3;
+
+    // Chave para a propriedade personalizada do Photon para rastrear respawns restantes
+    private const string RESPAWN_COUNT_KEY = "RespawnCount";
 
     public GameObject player;
 
@@ -15,41 +22,26 @@ public class RoomManager : MonoBehaviourPunCallbacks
     [Space]
     public GameObject roomCam;
 
-    private string nickName = "Nameless";
-
     [Space]
     public GameObject nameUI;
     public GameObject connectigUI;
 
-    // UI do Timer: LIGUE este campo ao seu objeto TextMeshPro no Inspector!
-    [Header("UI do Timer")]
-    public TMP_Text countdownText;
+    private string nickName = "Nameless";
 
-    public string roomNameToJoin = "Noname";
-
-    // --- Variáveis do Countdown ---
-    private const string START_TIME_KEY = "StrtTme";     // Chave da propriedade da sala para o tempo de início
-    private const int COUNTDOWN_DURATION = 90;          // Duração do countdown em segundos
-    private const int MIN_PLAYERS_TO_START = 2;         // Número mínimo de jogadores para iniciar o countdown
-
-    private float gameStartTime = 0f;                   // Tempo exato, sincronizado, em que o jogo deve começar
-    private bool countdownStarted = false;              // Indica se o countdown foi iniciado
-    private bool gameStarted = false;                   // Indica se a partida já começou
-    // -----------------------------
-
+    public string mapName = "Noname";
 
     void Awake()
     {
-        instance = this;
-
-        // Oculta o timer ao iniciar (o timer só deve aparecer quando a contagem começa)
-        if (countdownText != null)
+        // Garante que haja apenas uma instância do RoomManager
+        if (instance != null && instance != this)
         {
-            countdownText.gameObject.SetActive(false);
+            Destroy(this.gameObject);
+            return;
         }
+        instance = this;
+        DontDestroyOnLoad(this.gameObject); // Opcional, dependendo da sua gestão de cenas
     }
 
-    // --- Métodos de UI/Conexão Originais ---
     public void ChangeNickName(string _name)
     {
         nickName = _name;
@@ -59,7 +51,26 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         Debug.Log("Connecting...");
 
-        PhotonNetwork.JoinOrCreateRoom(roomNameToJoin, new Photon.Realtime.RoomOptions { MaxPlayers = 4 }, null);
+        RoomOptions ro = new RoomOptions();
+
+        // 1. Limita a sala a 4 jogadores
+        ro.MaxPlayers = 4;
+
+        ro.CustomRoomProperties = new Hashtable()
+        {
+            { "mapSceneIndex", SceneManager.GetActiveScene().buildIndex },
+            { "mapName", mapName }
+
+        };
+
+        ro.CustomRoomPropertiesForLobby = new[]
+        {
+            "mapSceneIndex",
+            "mapName"
+        };
+
+        // Entra ou cria a sala com as opções definidas
+        PhotonNetwork.JoinOrCreateRoom(roomName: PlayerPrefs.GetString(key: "RoomNameToJoin"), ro, typedLobby: null);
 
         nameUI.SetActive(false);
         connectigUI.SetActive(true);
@@ -69,165 +80,101 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         base.OnJoinedRoom();
 
-        Debug.Log("Joined room! Player Count: " + PhotonNetwork.CurrentRoom.PlayerCount);
+        Debug.Log("Joined room!");
 
         roomCam.SetActive(false);
 
+        // 2. Define a contagem inicial de respawn para o jogador local ao entrar na sala
+        SetInitialRespawnCount(PhotonNetwork.LocalPlayer);
+
         RespawnPlayer();
+    }
 
-        // 1. Master Client: verifica se o countdown deve começar (se já houver 2 players, incluindo ele)
-        if (PhotonNetwork.IsMasterClient)
-        {
-            CheckAndStartCountdown();
-        }
-        else
-        {
-            // 2. Cliente Comum: verifica se o Master Client já iniciou o countdown
-            if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey(START_TIME_KEY))
-            {
-                gameStartTime = (float)(double)PhotonNetwork.CurrentRoom.CustomProperties[START_TIME_KEY];
-                countdownStarted = true;
+    // --- LÓGICA DE RESPAWN E MORTE ---
 
-                // Ativa o timer na UI
-                if (countdownText != null)
-                {
-                    countdownText.gameObject.SetActive(true);
-                }
-            }
+    public void SetInitialRespawnCount(Player player)
+    {
+        // Define o número inicial de respawns se ainda não estiver definido
+        if (!player.CustomProperties.ContainsKey(RESPAWN_COUNT_KEY))
+        {
+            Hashtable props = new Hashtable();
+            // O jogador começa com 3 respawns
+            props.Add(RESPAWN_COUNT_KEY, MAX_RESPAWNS);
+            player.SetCustomProperties(props);
+            Debug.Log($"Jogador {player.NickName} inicializado com {MAX_RESPAWNS} respawns.");
         }
     }
 
     public void RespawnPlayer()
     {
-        Transform spawnPoint = spawnPoints[UnityEngine.Random.Range(0, spawnPoints.Length)];
+        // Obtém a contagem atual de respawns do jogador local
+        int respawnsLeft = GetRespawnCount(PhotonNetwork.LocalPlayer);
 
-        GameObject _player = PhotonNetwork.Instantiate(player.name, spawnPoint.position, Quaternion.identity);
-
-        // Assegura que os componentes PlayerSetup e Health existem
-        if (_player.GetComponent<PlayerSetup>() != null)
+        // Verifica se o jogador ainda tem respawns disponíveis
+        if (respawnsLeft > 0)
         {
+            Transform spawnPoint = spawnPoints[UnityEngine.Random.Range(0, spawnPoints.Length)];
+
+            // Instancia o jogador na rede
+            GameObject _player = PhotonNetwork.Instantiate(player.name, spawnPoint.position, Quaternion.identity);
             _player.GetComponent<PlayerSetup>().IsLocalPlayer();
-        }
-        if (_player.GetComponent<Health>() != null)
-        {
             _player.GetComponent<Health>().isLocalPlayer = true;
+
+            _player.GetComponent<PhotonView>().RPC("SetNickname", RpcTarget.AllBuffered, nickName);
+            PhotonNetwork.LocalPlayer.NickName = nickName;
+
+            Debug.Log($"Respawn realizado. Respawn(s) restante(s) antes da próxima morte: {respawnsLeft}");
         }
-
-        _player.GetComponent<PhotonView>().RPC("SetNickname", RpcTarget.AllBuffered, nickName);
-        PhotonNetwork.LocalPlayer.NickName = nickName;
-    }
-
-    // --- Lógica do Countdown (Sincronização) ---
-
-    // Chamado quando um novo jogador entra na sala
-    public override void OnPlayerEnteredRoom(Photon.Realtime.Player newPlayer)
-    {
-        base.OnPlayerEnteredRoom(newPlayer);
-
-        // Apenas o Master Client controla o início do countdown
-        if (PhotonNetwork.IsMasterClient)
+        else
         {
-            CheckAndStartCountdown();
+            // O jogador atingiu o limite de respawns
+            Debug.Log($"Limite de respawn atingido! Jogador {PhotonNetwork.LocalPlayer.NickName} não pode mais dar respawn.");
+            // Lógica para "Game Over" ou ecrã de espectador
         }
     }
 
-    // Verifica a condição mínima de jogadores para iniciar
-    private void CheckAndStartCountdown()
+    // Chamado pelo script Health.cs quando um jogador morre
+    public void OnPlayerDied(Player playerWhoDied)
     {
-        if (PhotonNetwork.CurrentRoom.PlayerCount >= MIN_PLAYERS_TO_START && !countdownStarted)
+        // APENAS o MasterClient deve manipular e sincronizar o estado da sala para evitar conflitos
+        if (!PhotonNetwork.IsMasterClient) return;
+
+        int currentRespawnCount = GetRespawnCount(playerWhoDied);
+
+        if (currentRespawnCount > 0)
         {
-            StartCountdown();
+            // Decrementa a contagem de respawns
+            currentRespawnCount--;
+
+            Hashtable props = new Hashtable();
+            props.Add(RESPAWN_COUNT_KEY, currentRespawnCount);
+            // Sincroniza a nova contagem para todos os jogadores
+            playerWhoDied.SetCustomProperties(props);
+
+            Debug.Log($"Jogador {playerWhoDied.NickName} morreu. Restam {currentRespawnCount} respawn(s).");
+        }
+        else
+        {
+            Debug.Log($"Jogador {playerWhoDied.NickName} foi eliminado do jogo.");
         }
     }
 
-    // Inicia o countdown (apenas Master Client)
-    private void StartCountdown()
+    // Função auxiliar para obter a contagem de respawns de forma segura
+    private int GetRespawnCount(Player player)
     {
-        countdownStarted = true;
-
-        // Define o tempo de rede (sincronizado) em que o jogo deve começar
-        double timeToStartGame = PhotonNetwork.Time + COUNTDOWN_DURATION;
-
-        Hashtable customProps = new Hashtable
+        if (player.CustomProperties.TryGetValue(RESPAWN_COUNT_KEY, out object count))
         {
-            { START_TIME_KEY, timeToStartGame }
-        };
-
-        // Envia a propriedade para todos os clientes
-        PhotonNetwork.CurrentRoom.SetCustomProperties(customProps);
-
-        // Ativa o timer na UI
-        if (countdownText != null)
-        {
-            countdownText.gameObject.SetActive(true);
+            return (int)count;
         }
-
-        Debug.Log("Countdown iniciado!");
+        // Se a propriedade não estiver definida, assume-se o valor máximo
+        return MAX_RESPAWNS;
     }
 
-    // Chamado em todos os clientes quando a propriedade do tempo é enviada
-    public override void OnRoomPropertiesUpdate(Hashtable propertiesThatChanged)
+    // --- LÓGICA DE CONEXÃO E DESCONEXÃO ---
+
+    public override void OnPlayerLeftRoom(Player otherPlayer)
     {
-        base.OnRoomPropertiesUpdate(propertiesThatChanged);
-
-        if (propertiesThatChanged.ContainsKey(START_TIME_KEY) && !gameStarted)
-        {
-            gameStartTime = (float)(double)propertiesThatChanged[START_TIME_KEY];
-            countdownStarted = true;
-
-            // Ativa o timer na UI
-            if (countdownText != null)
-            {
-                countdownText.gameObject.SetActive(true);
-            }
-        }
-    }
-
-    // --- Loop Principal do Jogo/Countdown ---
-    void Update()
-    {
-        // Se o countdown está ativo e o jogo ainda não começou
-        if (countdownStarted && !gameStarted)
-        {
-            // Tempo restante usando o tempo de rede sincronizado
-            float timeLeft = gameStartTime - (float)PhotonNetwork.Time;
-
-            if (timeLeft > 0f)
-            {
-                // Arredonda o tempo para cima para exibir
-                int secondsLeft = Mathf.CeilToInt(timeLeft);
-
-                // ATUALIZA O TEXTO DO TIMER
-                if (countdownText != null)
-                {
-                    countdownText.text = "Início em: " + secondsLeft.ToString() + "s";
-                }
-            }
-            else // Tempo Esgotado!
-            {
-                if (!gameStarted)
-                {
-                    gameStarted = true;
-                    StartGameForAll();
-                }
-            }
-        }
-    }
-
-    // Inicia o jogo para todos os jogadores
-    private void StartGameForAll()
-    {
-        Debug.Log(" O JOGO VAI COMEÇAR AGORA!");
-
-        // Desativa a UI de espera/conexão e o timer
-        connectigUI.SetActive(false);
-
-        if (countdownText != null)
-        {
-            countdownText.gameObject.SetActive(false);
-            countdownText.text = "";
-        }
-
-        // Adicione aqui a lógica de início de jogo (habilitar controles, etc.)
+        base.OnPlayerLeftRoom(otherPlayer);
+        Debug.LogFormat("OnPlayerLeftRoom() {0}", otherPlayer.NickName);
     }
 }

@@ -7,9 +7,9 @@ using ExitGames.Client.Photon;
 public class Health : MonoBehaviourPunCallbacks
 {
     [Header("Vida")]
-    public int maxHealth = 100;   // Vida máxima
-    public int health = 100;      // Vida actual
-    public bool isLocalPlayer;
+    public int maxHealth = 100;   // Vida máxima
+    public int health = 100;      // Vida actual
+    public bool isLocalPlayer;
 
     public RectTransform healthBar;
     private float originalHealthBarsize;
@@ -25,7 +25,7 @@ public class Health : MonoBehaviourPunCallbacks
 
     private bool isDead = false; // Flag importante para não levar dano depois de morrer
 
-    private void Awake()
+    private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
         playerMovement = GetComponent<Movement2D>();
@@ -35,152 +35,157 @@ public class Health : MonoBehaviourPunCallbacks
     {
         originalHealthBarsize = healthBar.sizeDelta.x;
 
-        // Garante que a vida inicial não passa do máximo nem fica negativa
-        health = Mathf.Clamp(health, 0, maxHealth);
+        // Garante que a vida inicial não passa do máximo nem fica negativa
+        health = Mathf.Clamp(health, 0, maxHealth);
 
         UpdateHealthUI();
     }
 
-    // ------------------- KNOCKBACK -------------------
+    // ------------------- KNOCKBACK -------------------
 
-    // Método que inicia a Coroutine de Knockback
-    public void ApplyKnockback(Vector3 attackerPosition)
+    // Método que inicia a Coroutine de Knockback
+    public void ApplyKnockback(Vector3 attackerPosition)
     {
         if (rb == null || playerMovement == null) return;
 
-        // Calcula a direção oposta ao atacante
-        Vector2 direction = (transform.position - attackerPosition).normalized;
+        // Calcula a direção oposta ao atacante
+        Vector2 direction = (transform.position - attackerPosition).normalized;
 
-        // Inicia a rotina de knockback
-        StartCoroutine(KnockbackRoutine(direction));
+        // Inicia a rotina de knockback
+        StartCoroutine(KnockbackRoutine(direction));
     }
 
-    // Coroutine para aplicar a força e controlar o estado do jogador
-    private IEnumerator KnockbackRoutine(Vector2 direction)
+    // Coroutine para aplicar a força e controlar o estado do jogador
+    private IEnumerator KnockbackRoutine(Vector2 direction)
     {
-        // 1. Desativa o controlo do jogador
-        playerMovement.SetKnockbackState(true);
+        // 1. Desativa o controlo do jogador
+        playerMovement.SetKnockbackState(true);
 
-        // 2. Aplica a força de impulso
-        rb.AddForce(direction * knockbackForce, ForceMode2D.Impulse);
+        // 2. Aplica a força de impulso
+        rb.AddForce(direction * knockbackForce, ForceMode2D.Impulse);
 
-        // 3. Espera pela duração do knockback
-        yield return new WaitForSeconds(knockbackDuration);
+        // 3. Espera pela duração do knockback
+        yield return new WaitForSeconds(knockbackDuration);
 
-        // 4. Limpa a velocidade horizontal para evitar que o jogador deslize indefinidamente
-        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+        // 4. Limpa a velocidade horizontal para evitar que o jogador deslize indefinidamente
+        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
 
-        // 5. Reativa o controlo do jogador
-        playerMovement.SetKnockbackState(false);
+        // 5. Reativa o controlo do jogador
+        playerMovement.SetKnockbackState(false);
     }
 
-    // ------------------- DANO -------------------
+    // ------------------- DANO -------------------
 
-    [PunRPC]
+    [PunRPC]
     public void TakeDamage(int _damage, int attackerViewID = -1)
     {
         if (isDead) return; // Se já estiver morto, ignora dano adicional
 
-        // Retira vida mas nunca abaixo de 0
-        health = Mathf.Max(health - _damage, 0);
+        // Retira vida mas nunca abaixo de 0
+        health = Mathf.Max(health - _damage, 0);
 
         UpdateHealthUI();
 
         Debug.Log($"{gameObject.name} recebeu {_damage} de dano. Vida restante: {health}");
 
-        // --- Lógica de Knockback (SOMENTE para o Local Player) ---
-        if (isLocalPlayer && attackerViewID != -1)
+        // --- Lógica de Knockback (SOMENTE para o Local Player) ---
+        if (isLocalPlayer && attackerViewID != -1)
         {
             PhotonView attackerView = PhotonView.Find(attackerViewID);
             if (attackerView != null)
             {
-                // Se o atacante tiver um CombatSystem2D, assumimos que é um JOGADOR.
-                CombatSystem2D attackerCombat = attackerView.GetComponent<CombatSystem2D>();
-
-                // Se o atacante tiver um EnemyAI, assumimos que é um INIMIGO.
+                // ... (Lógica de Knockback permanece a mesma)
+                CombatSystem2D attackerCombat = attackerView.GetComponent<CombatSystem2D>();
                 EnemyAI attackerAI = attackerView.GetComponent<EnemyAI>();
 
-                // Aplicar knockback se for um Jogador OU um Inimigo.
                 if (attackerCombat != null || attackerAI != null)
                 {
-                    // Aplica o knockback usando a posição do atacante
                     ApplyKnockback(attackerView.transform.position);
                 }
             }
         }
-        // ---------------------------------------------------------
+        // ---------------------------------------------------------
 
-        if (health <= 0)
+        if (health <= 0)
         {
             isDead = true; // Marca como morto imediatamente
-            Debug.Log($"{gameObject.name} morreu!");
+            Debug.Log($"{gameObject.name} morreu!");
 
-            // Atualiza deaths E notifica o atacante (APENAS O CLIENTE LOCAL)
-            if (isLocalPlayer) // ou podes usar if (photonView.IsMine)
-            {
-                // 1. Contar a MORTE (Death)
+            if (isLocalPlayer) // Apenas o jogador que morreu processa esta lógica
+            {
+                // >>> ALTERAÇÃO PRINCIPAL: NOTIFICAR ROOM MANAGER <<<
+
+                // 1. Notifica o RoomManager (o MasterClient irá decrementar o contador de respawn)
+                if (RoomManager.instance != null)
+                {
+                    // Passamos o jogador local para o RoomManager processar a morte
+                    RoomManager.instance.OnPlayerDied(PhotonNetwork.LocalPlayer);
+                }
+
+                // 2. Tenta fazer Respawn (o RoomManager verificará se o contador permite)
+                if (RoomManager.instance != null)
+                {
+                    RoomManager.instance.RespawnPlayer();
+                }
+
+                // 3. Lógica de Kills/Deaths (mantida do seu código original)
+
+                // Aumenta a contagem de Mortes (Deaths)
                 int currentDeaths = 0;
                 if (PhotonNetwork.LocalPlayer.CustomProperties.ContainsKey("Deaths"))
                     currentDeaths = (int)PhotonNetwork.LocalPlayer.CustomProperties["Deaths"];
                 currentDeaths++;
 
                 ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable
-                {
-                { "Deaths", currentDeaths }
-                };
+        {
+        { "Deaths", currentDeaths }
+        };
                 PhotonNetwork.LocalPlayer.SetCustomProperties(props);
-                // 2. Fazer Respawn
-                if (RoomManager.instance != null)
-                    RoomManager.instance.RespawnPlayer();
 
-                // 3. Notificar o atacante
+                // Notificar o atacante (para KillConfirmed)
                 if (attackerViewID != -1)
                 {
                     PhotonView attackerView = PhotonView.Find(attackerViewID);
                     if (attackerView != null)
                     {
-                        // Procura por CombatSystem2D (pois só o Player tem este script com KillConfirmed)
                         CombatSystem2D attackerCombat = attackerView.GetComponent<CombatSystem2D>();
                         if (attackerCombat != null)
                             attackerView.RPC(nameof(CombatSystem2D.KillConfirmed), attackerView.Owner);
-
-                        // NOTA: Se o atacante for um inimigo (EnemyAI), não tem KillConfirmed. 
-                        // Apenas jogadores pontuam kills.
                     }
                 }
-            }
 
-            // Destroi o objeto morto (somente dono)
-            PhotonView view = GetComponent<PhotonView>();
-            if (view != null && view.IsMine)
-                PhotonNetwork.Destroy(gameObject);
+                // 4. Destroi o objeto morto (somente o dono, após processar a morte/respawn)
+                PhotonView view = GetComponent<PhotonView>();
+                if (view != null && view.IsMine)
+                    PhotonNetwork.Destroy(gameObject);
+            }
         }
     }
 
-    // ------------------- CURA -------------------
+    // ------------------- CURA -------------------
 
-    [PunRPC]
+    [PunRPC]
     public void Heal(int amount)
     {
         if (isDead) return; // Não cura mortos
 
-        // Soma vida mas sem ultrapassar o máximo
-        health = Mathf.Clamp(health + amount, 0, maxHealth);
+        // Soma vida mas sem ultrapassar o máximo
+        health = Mathf.Clamp(health + amount, 0, maxHealth);
 
         UpdateHealthUI();
 
         Debug.Log($"{gameObject.name} foi curado em {amount}. Vida actual: {health}");
     }
 
-    // ------------------- UI -------------------
+    // ------------------- UI -------------------
 
-    private void UpdateHealthUI()
+    private void UpdateHealthUI()
     {
         if (healthBar != null)
         {
             healthBar.sizeDelta = new Vector2(
-                originalHealthBarsize * health / (float)maxHealth,
-                healthBar.sizeDelta.y
+              originalHealthBarsize * health / (float)maxHealth,
+              healthBar.sizeDelta.y
             );
         }
 
