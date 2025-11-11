@@ -1,6 +1,9 @@
 using UnityEngine;
 using Photon.Pun; // Mantido para contexto
 
+// Garante que o script PlayerSetup (ou um script que chame IsLocalPlayer)
+// está no objeto para obter o PhotonView se necessário para controle local.
+
 [RequireComponent(typeof(Rigidbody2D))]
 public class Movement2D : MonoBehaviour
 {
@@ -33,15 +36,26 @@ public class Movement2D : MonoBehaviour
     private Animator anim;
     private SpriteRenderer spriteRenderer;
 
+    // NOVO: Adicione uma referência ao PhotonView para saber se este é o jogador local.
+    private PhotonView pv;
+
     void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         combatSystem = GetComponent<CombatSystem2D>();
         anim = GetComponent<Animator>();
         spriteRenderer = GetComponent<SpriteRenderer>();
+        pv = GetComponent<PhotonView>(); // Inicializa o PhotonView
 
         if (groundCheck == null)
             Debug.LogWarning("GroundCheck não atribuído no inspector!");
+
+        // Se este for um jogador remoto ou se o PhotonView não estiver configurado,
+        // o script só deve ser executado no jogador local.
+        if (pv == null || !pv.IsMine)
+        {
+            enabled = false; // Desativa o script se não for o jogador local
+        }
     }
 
     // Método público para ser chamado pelo Health.cs
@@ -52,6 +66,29 @@ public class Movement2D : MonoBehaviour
 
     void Update()
     {
+        // --- 0. VERIFICAÇÃO DO LOBBY (NOVA LÓGICA) ---
+        // Impede o movimento se o LobbyManager não permitir (ou seja, durante o countdown).
+        // Se o LobbyManager.instance for null (ex: se o jogo começou e ele foi destruído ou não está na cena),
+        // assumimos que o jogo está a correr.
+        if (LobbyManager.instance != null && LobbyManager.GameStartedAndPlayerCanMove == false)
+        {
+            // Parar completamente o movimento horizontal enquanto espera no lobby
+            if (rb != null)
+            {
+                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+            }
+
+            // Atualiza animações para estado parado
+            if (anim)
+            {
+                anim.SetFloat("Speed", 0f);
+                // Não precisa de fazer return; aqui, mas vamos otimizar:
+            }
+
+            // Retorna para ignorar toda a lógica de input
+            return;
+        }
+
         // 1. VERIFICAR CHÃO SEMPRE (OverlapCircle, mais robusto)
         if (groundCheck != null)
         {
