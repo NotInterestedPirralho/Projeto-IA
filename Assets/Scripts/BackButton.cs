@@ -8,21 +8,23 @@ public class BackButtonToMenu : MonoBehaviour
     public string mainMenuSceneName = "MainMenu";
 
     /// <summary>
-    /// Função que é chamada quando o botão "Back" é clicado.
-    /// Carrega a cena do Menu Principal.
+    /// Função chamada ao clicar no botão.
+    /// Carrega a cena do Menu Principal no modo Single, descarregando as restantes.
     /// </summary>
     public void OnClickBack()
     {
-        // Verifica se o nome da cena foi definido para evitar erros
         if (string.IsNullOrEmpty(mainMenuSceneName))
         {
-            Debug.LogError("O nome da cena 'Main Menu' não está definido no Inspetor!");
+            Debug.LogError("O nome da cena 'Main Menu' não está definido!");
             return;
         }
 
-        // Carrega a cena especificada
-        SceneManager.LoadScene(mainMenuSceneName);
+        // --- PONTO CHAVE: LoadSceneMode.Single ---
+        // Este modo garante que todas as cenas atualmente carregadas
+        // (exceto objetos marcados com DontDestroyOnLoad) 
+        // são descarregadas antes de carregar a nova cena.
+        SceneManager.LoadScene(mainMenuSceneName, LoadSceneMode.Single);
 
-        Debug.Log("Voltando para a cena: " + mainMenuSceneName);
+        Debug.Log("Voltando para o Menu Principal e descarregando cenas anteriores: " + mainMenuSceneName);
     }
 }
