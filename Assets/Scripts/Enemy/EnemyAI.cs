@@ -1,4 +1,4 @@
-//EnemyAI
+// EnemyAI
 using UnityEngine;
 using System.Collections;
 using Photon.Pun;
@@ -40,18 +40,19 @@ public class EnemyAI : MonoBehaviourPunCallbacks
     public float wallCheckDistanceChase = 0.5f;
 
     [Header("Combate / Knockback")]
-    public float knockbackForce = 15f;
-    public float stunTime = 0.5f;
-    public int attackDamage = 7;            // Dano que o inimigo causa
-    public float attackCooldown = 1.5f;       // Tempo entre ataques do inimigo
+    public float knockbackForce = 10f;          // Força de knockback que o inimigo APLICA
+    public float stunTime = 0.5f;               // Duração do stun (pode ser usado como duração do knockback)
+    public int attackDamage = 7;                // Dano que o inimigo causa
+    public float attackCooldown = 1.5f;         // Tempo entre ataques do inimigo
 
-    // NOVA VARIÁVEL: Define a distância exata que o ponto de ataque deve estar do centro.
+    // Variável: Define a distância exata que o ponto de ataque deve estar do centro.
     public float attackOffsetDistance = 0.5f;
 
-    public Transform attackPoint;             // Ponto de origem do ataque do inimigo (filho do Enemy)
-    public LayerMask playerLayer;             // Camada do Jogador
+    public Transform attackPoint;               // Ponto de origem do ataque do inimigo (filho do Enemy)
+    public LayerMask playerLayer;               // Camada do Jogador
 
     // --- Propriedades para acesso externo (EnemyHealth) ---
+    // (Estas propriedades devem ser usadas se o inimigo for atacado)
     public float KnockbackForce => knockbackForce;
     public float StunTime => stunTime;
 
@@ -147,7 +148,6 @@ public class EnemyAI : MonoBehaviourPunCallbacks
 
         FlipSprite(direction);
 
-        // ** ALTERAÇÃO AQUI **: Verifica se pode ver o player antes de começar a perseguição.
         if (CanSeePlayer())
         {
             currentState = AIState.Chase;
@@ -171,7 +171,6 @@ public class EnemyAI : MonoBehaviourPunCallbacks
             currentState = AIState.Attack;
             return;
         }
-        // ** ALTERAÇÃO AQUI **: Retorna ao Patrol se estiver demasiado longe OU se a linha de visão for bloqueada.
         else if (distance > chaseRange * 1.5f || !CanSeePlayer())
         {
             currentState = AIState.Patrol;
@@ -229,7 +228,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
         // Apenas para manter o estado
     }
 
-    // --- FUNÇÃO DE FLIP AUXILIAR (CORREÇÃO FINAL: Usa a nova variável attackOffsetDistance) ---
+    // --- FUNÇÃO DE FLIP AUXILIAR ---
     private void FlipSprite(float currentDirection)
     {
         if (spriteRenderer == null || attackPoint == null) return;
@@ -238,11 +237,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
         spriteRenderer.flipX = (currentDirection < 0);
 
         // 2. CORREÇÃO DO ATTACK POINT (Reposiciona o ataque para a frente)
-
-        // Usa o sinal da direção (1 ou -1) para determinar se a posição X é positiva ou negativa.
         float newLocalX = attackOffsetDistance * Mathf.Sign(currentDirection);
-
-        // Aplica a nova posição LOCAL.
         attackPoint.localPosition = new Vector3(newLocalX, attackPoint.localPosition.y, attackPoint.localPosition.z);
     }
 
@@ -250,10 +245,9 @@ public class EnemyAI : MonoBehaviourPunCallbacks
 
     void DoAttack()
     {
-        // O Physics2D.OverlapCircleAll usa a posição GLOBAL do attackPoint.
         Collider2D[] hitPlayers = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, playerLayer);
 
-        if (hitPlayers.Length == 0) // O Debug.LogError deveria aparecer aqui.
+        if (hitPlayers.Length == 0)
         {
             Debug.LogError($"[ERRO DE HIT] OverlapCircle não detetou NINGUÉM. Pos: {attackPoint.position}, Raio: {attackRange}, Layer: {playerLayer.value}");
         }
@@ -269,10 +263,18 @@ public class EnemyAI : MonoBehaviourPunCallbacks
                 bool playerDefending = (playerCombat != null && playerCombat.isDefending);
                 int finalDamage = playerDefending ? attackDamage / 4 : attackDamage;
 
-                // Chamada de Dano pela Rede (RPC)
-                targetView.RPC(nameof(Health.TakeDamage), RpcTarget.All, finalDamage, photonView.ViewID);
+                // ** ALTERAÇÃO CRÍTICA AQUI **
+                // Chamada de Dano pela Rede (RPC) - AGORA INCLUI FORÇA DE KNOCKBACK E DURAÇÃO
+                targetView.RPC(
+                    nameof(Health.TakeDamage),
+                    RpcTarget.All,
+                    finalDamage,
+                    photonView.ViewID,
+                    knockbackForce,         // Força de Knockback que o inimigo APLICA
+                    stunTime                // Duração do Knockback (usa o stunTime como proxy)
+                );
 
-                Debug.Log($"Inimigo atacou {player.name} com {finalDamage} de dano!");
+                Debug.Log($"Inimigo atacou {player.name} com {finalDamage} de dano! Enviou knockback: {knockbackForce}");
             }
         }
     }
@@ -292,7 +294,6 @@ public class EnemyAI : MonoBehaviourPunCallbacks
 
     // --- 7. UTILS & COROUTINES ---
 
-    // ** NOVA FUNÇÃO **: Verifica a linha de visão usando Raycasting.
     bool CanSeePlayer()
     {
         if (playerTarget == null) return false;
@@ -300,19 +301,14 @@ public class EnemyAI : MonoBehaviourPunCallbacks
         Vector2 selfPos = transform.position;
         Vector2 targetPos = playerTarget.position;
 
-        // 1. Verificação de Distância (Rápida)
         float distance = Vector2.Distance(selfPos, targetPos);
         if (distance > chaseRange)
         {
             return false;
         }
 
-        // 2. Verificação de Linha de Visão (Linecast)
-        // Lança um raio da posição do inimigo até o jogador, mas SÓ verifica a 'groundLayer'
         RaycastHit2D hit = Physics2D.Linecast(selfPos, targetPos, groundLayer);
 
-        // Se 'hit.collider' for null, significa que o raio não atingiu NENHUM objeto
-        // na groundLayer no caminho, ou seja, a linha de visão está limpa.
         return hit.collider == null;
     }
 
@@ -359,8 +355,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, chaseRange);
 
-        // Desenha a linha de visao quando o inimigo esta no modo Patrol
-        if (playerTarget != null && currentState == AIState.Patrol)
+        if (playerTarget != null)
         {
             Gizmos.color = CanSeePlayer() ? Color.green : Color.red;
             Gizmos.DrawLine(transform.position, playerTarget.position);

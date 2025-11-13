@@ -2,24 +2,26 @@ using System.Collections;
 using UnityEngine;
 using Photon.Pun;
 using TMPro;
-// Usar o alias completo para Hashtable do Photon para evitar ambiguidade.
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 
 public class Health : MonoBehaviourPunCallbacks
 {
     [Header("Vida")]
-    public int maxHealth = 100;   // Vida máxima
-    public int health = 100;      // Vida actual
-    public bool isLocalPlayer;
+    public int maxHealth = 100;    // Vida mï¿½xima
+    public int health = 100;       // Vida actual
+    public bool isLocalPlayer;
 
     public RectTransform healthBar;
     private float originalHealthBarsize;
 
     [Header("Knockback")]
-    public float knockbackForce;
-    public float knockbackDuration;
+    // Estes valores sï¿½ serï¿½o usados se o atacante nï¿½o fornecer a forï¿½a (Fallback).
+    public float knockbackForceFallback = 10f;
+    public float knockbackDurationFallback = 0.3f;
+
     private Rigidbody2D rb;
     private Movement2D playerMovement;
+    private bool isKnockedBack = false; // Flag para evitar knockback sobreposto
 
     [Header("UI")]
     public TextMeshProUGUI healthText;
@@ -41,33 +43,58 @@ public class Health : MonoBehaviourPunCallbacks
         UpdateHealthUI();
     }
 
-    // ------------------- KNOCKBACK -------------------
+    // --- 1. Lï¿½GICA DE KNOCKBACK ---
 
-    public void ApplyKnockback(Vector3 attackerPosition)
+    /// <summary>
+    /// Aplica a repulsï¿½o ao jogador, utilizando a forï¿½a e duraï¿½ï¿½o fornecidas pelo atacante.
+    /// </summary>
+    public void ApplyKnockback(Vector3 attackerPosition, float force, float duration)
     {
-        if (rb == null || playerMovement == null || isDead) return;
+        // Se jï¿½ estiver em knockback ou morto, ignora.
+        if (rb == null || playerMovement == null || isDead || isKnockedBack) return;
 
+        // 1. Calcula a direï¿½ï¿½o
         Vector2 direction = (transform.position - attackerPosition).normalized;
-        StartCoroutine(KnockbackRoutine(direction));
+
+        // 2. Garante um Y mï¿½nimo (0.2f) para descolar do chï¿½o (evita o "ficar no sï¿½tio" devido ï¿½ fricï¿½ï¿½o).
+        // Isto ï¿½ o que foi corrigido anteriormente para evitar o problema do "saltar".
+        if (direction.y < 0.2f) direction.y = 0.2f;
+        direction = direction.normalized;
+
+        // 3. Inicia a corrotina com os valores do atacante
+        StartCoroutine(KnockbackRoutine(direction, force, duration));
     }
 
-    private IEnumerator KnockbackRoutine(Vector2 direction)
+    private IEnumerator KnockbackRoutine(Vector2 direction, float force, float duration)
     {
-        playerMovement.SetKnockbackState(true);
+        isKnockedBack = true;
+        playerMovement.SetKnockbackState(true); // Bloqueia o controlo no Movement2D
 
-        rb.AddForce(direction * knockbackForce, ForceMode2D.Impulse);
+        // Zera a velocidade atual para garantir que o impulso ï¿½ aplicado corretamente
+        rb.linearVelocity = Vector2.zero;
 
-        yield return new WaitForSeconds(knockbackDuration);
+        // Aplica a forï¿½a de IMPULSO (isto faz o player voar para trï¿½s)
+        rb.AddForce(direction * force, ForceMode2D.Impulse);
 
-        rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+        // Espera pela duraï¿½ï¿½o do knockback
+        yield return new WaitForSeconds(duration);
 
+        // Termina o knockback. O Movement2D retoma o controlo.
         playerMovement.SetKnockbackState(false);
+        isKnockedBack = false;
+
+        // Opcional: Se quiser parar imediatamente o movimento horizontal apï¿½s o tempo
+        // rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
     }
 
-    // ------------------- DANO -------------------
+    // --- 2. Lï¿½GICA DE DANO E SINCRONIZAï¿½ï¿½O DE REDE ---
 
-    [PunRPC]
-    public void TakeDamage(int _damage, int attackerViewID = -1)
+    /// <summary>
+    /// Recebe dano e, se for o jogador local, aplica knockback.
+    /// </summary>
+    [PunRPC]
+    // O RPC agora aceita a Forï¿½a e a Duraï¿½ï¿½o do Knockback do atacante.
+    public void TakeDamage(int _damage, int attackerViewID = -1, float attackerKnockbackForce = 0f, float attackerKnockbackDuration = 0f)
     {
         if (isDead) return;
 
@@ -77,28 +104,33 @@ public class Health : MonoBehaviourPunCallbacks
 
         Debug.Log($"{gameObject.name} recebeu {_damage} de dano. Vida restante: {health}");
 
-        // --- Lógica de Knockback (apenas para o jogador local) ---
-        if (view.IsMine && attackerViewID != -1)
+        // --- Lï¿½gica de Knockback (apenas para o jogador local) ---
+        if (view.IsMine && attackerViewID != -1)
         {
             PhotonView attackerView = PhotonView.Find(attackerViewID);
             if (attackerView != null)
             {
-                // Assumindo CombatSystem2D ou EnemyAI para identificar o atacante
-                if (attackerView.GetComponent<CombatSystem2D>() != null || attackerView.GetComponent<EnemyAI>() != null)
-                {
-                    ApplyKnockback(attackerView.transform.position);
-                }
+                // Decide qual forï¿½a e duraï¿½ï¿½o usar (do atacante ou fallback)
+                float finalForce = (attackerKnockbackForce > 0) ? attackerKnockbackForce : knockbackForceFallback;
+                float finalDuration = (attackerKnockbackDuration > 0) ? attackerKnockbackDuration : knockbackDurationFallback;
+
+                // Aplica o knockback
+                ApplyKnockback(
+                    attackerView.transform.position,
+                    finalForce,
+                    finalDuration
+                );
             }
         }
-        // ---------------------------------------------------------
+        // ---------------------------------------------------------
 
-        if (health <= 0)
+        if (health <= 0)
         {
             isDead = true;
             Debug.Log($"{gameObject.name} morreu!");
 
-            // Lógica SÓ DEVE SER EXECUTADA PELO DONO DO OBJETO MORTO
-            if (view.IsMine)
+            // Lï¿½gica Sï¿½ DEVE SER EXECUTADA PELO DONO DO OBJETO MORTO
+            if (view.IsMine)
             {
                 // 1. Notifica o RoomManager sobre a morte
                 if (RoomManager.instance != null)
@@ -113,41 +145,38 @@ public class Health : MonoBehaviourPunCallbacks
                 }
 
                 // 3. Atualiza a contagem de Mortes (Deaths)
-                int currentDeaths = 0;
-                // Usa o tipo Hashtable correto (já definido no topo)
-                if (view.Owner.CustomProperties.ContainsKey("Deaths"))
+                int currentDeaths = 0;
+                if (view.Owner.CustomProperties.ContainsKey("Deaths"))
                     currentDeaths = (int)view.Owner.CustomProperties["Deaths"];
                 currentDeaths++;
 
                 Hashtable props = new Hashtable
-        {
-            { "Deaths", currentDeaths }
-        };
+                {
+                    { "Deaths", currentDeaths }
+                };
                 view.Owner.SetCustomProperties(props);
 
-                // 4. Notificar o atacante (para KillConfirmed)
-                if (attackerViewID != -1)
+                // 4. Notificar o atacante (para KillConfirmed)
+                if (attackerViewID != -1)
                 {
                     PhotonView attackerView = PhotonView.Find(attackerViewID);
                     if (attackerView != null)
                     {
                         CombatSystem2D attackerCombat = attackerView.GetComponent<CombatSystem2D>();
                         if (attackerCombat != null)
-                            // CORREÇÃO CS0117: RpcTarget.Owner não existe. O correto é RpcTarget.MasterClient se for uma mensagem global
-                            // Mas se for só para o Atacante, use: attackerView.Owner (que é o objeto Player)
                             attackerView.RPC(nameof(CombatSystem2D.KillConfirmed), attackerView.Owner);
                     }
                 }
 
-                // 5. Destrói o objeto na rede (apenas o dono deve fazê-lo)
+                // 5. Destrï¿½i o objeto na rede (apenas o dono deve fazï¿½-lo)
                 PhotonNetwork.Destroy(gameObject);
             }
         }
     }
 
-    // ------------------- CURA -------------------
+    // --- 3. Lï¿½GICA DE CURA E UI ---
 
-    [PunRPC]
+    [PunRPC]
     public void Heal(int amount)
     {
         if (isDead) return;
@@ -159,15 +188,13 @@ public class Health : MonoBehaviourPunCallbacks
         Debug.Log($"{gameObject.name} foi curado em {amount}. Vida actual: {health}");
     }
 
-    // ------------------- UI -------------------
-
-    private void UpdateHealthUI()
+    private void UpdateHealthUI()
     {
         if (healthBar != null)
         {
             healthBar.sizeDelta = new Vector2(
-              originalHealthBarsize * health / (float)maxHealth,
-              healthBar.sizeDelta.y
+                originalHealthBarsize * health / (float)maxHealth,
+                healthBar.sizeDelta.y
             );
         }
 

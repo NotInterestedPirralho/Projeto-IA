@@ -1,14 +1,11 @@
 using UnityEngine;
 using Photon.Pun;
 
-// Garante que o script PlayerSetup (ou um script que chame IsLocalPlayer)
-// está no objeto para obter o PhotonView se necessário para controle local.
-
 [RequireComponent(typeof(Rigidbody2D))]
 public class Movement2D : MonoBehaviour
 {
     [Header("Movimento")]
-    public float walkSpeed = 5f; // Valores padrão para segurança
+    public float walkSpeed = 5f;
     public float sprintSpeed = 8f;
 
     [Header("Pulo")]
@@ -32,12 +29,10 @@ public class Movement2D : MonoBehaviour
     private bool grounded;
     private int jumpCount;
 
-    // Opcional: Assumindo que CombatSystem2D existe e tem a flag isDefending
     private CombatSystem2D combatSystem;
     private Animator anim;
     private SpriteRenderer spriteRenderer;
 
-    // Referência ao PhotonView para saber se este é o jogador local.
     private PhotonView pv;
 
     void Start()
@@ -58,7 +53,6 @@ public class Movement2D : MonoBehaviour
             return;
         }
 
-        // No início, forçamos o isKnockedBack para false.
         isKnockedBack = false;
     }
 
@@ -80,79 +74,82 @@ public class Movement2D : MonoBehaviour
             );
         }
 
-        // --- MUDANÇA AQUI: REMOÇÃO DA DEPENDÊNCIA DO LOBBY MANAGER ---
-        // Se estiver em Knockback, bloqueia todo o controlo de input.
+        // --- LÓGICA DE KNOCKBACK (CORRIGIDA) ---
+        // Se estiver em Knockback, bloqueia o controlo, mas permite que a física do knockback mova o Rigidbody.
         if (isKnockedBack)
         {
-            // Parar completamente o movimento horizontal
-            if (rb != null)
+            if (rb != null && grounded)
             {
-                // Zera a velocidade horizontal, mas mantém a vertical (para cair ou ser empurrado)
-                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+                // Opcional: Trava o movimento horizontal imediatamente se estiver no chão, para evitar deslize excessivo
+                // Mas, por agora, VAMOS DEIXAR A FORÇA DE IMPULSO DO KNOCKBACK MOVER O PLAYER.
+                // Não anular rb.linearVelocity.x aqui!
             }
+
             if (anim)
             {
-                anim.SetFloat("Speed", 0f);
+                anim.SetFloat("Speed", 0f); // Animação de parado/stunned
                 anim.SetBool("Grounded", grounded);
             }
             return; // IGNORA O RESTO DA LÓGICA DE INPUT
         }
 
-
         // Se chegámos aqui, o controlo está ATIVO.
 
         // 2. LÓGICA DE RESET DE SALTO
-        // Se está no chão E está quase parado verticalmente, reseta o salto
         if (rb != null && grounded && Mathf.Abs(rb.linearVelocity.y) <= 0.1f)
         {
             jumpCount = 0;
         }
 
         float move = 0f;
-        // Assume que CombatSystem2D existe
         bool isDefending = (combatSystem != null && combatSystem.isDefending);
 
         // 3. LÓGICA DE MOVIMENTO E SALTO (SÓ se NÃO estiver a defender)
         if (!isDefending)
         {
             // Movimento horizontal
-            move = Input.GetAxisRaw("Horizontal"); // Usar GetAxisRaw para movimento instantâneo
+            move = Input.GetAxisRaw("Horizontal");
             sprinting = Input.GetKey(KeyCode.LeftShift);
 
-            // Lógica de velocidade
-            // Certifique-se de que walkSpeed e sprintSpeed são > 0 no Inspector
             float currentSpeed = sprinting ? sprintSpeed : walkSpeed;
 
-            rb.linearVelocity = new Vector2(move * currentSpeed, rb.linearVelocity.y);
+            // Aplica a velocidade de movimento (apenas se houver input)
+            if (Mathf.Abs(move) > 0.05f)
+            {
+                rb.linearVelocity = new Vector2(move * currentSpeed, rb.linearVelocity.y);
+            }
+            else
+            {
+                // Se não houver input, define a velocidade horizontal para zero para parar.
+                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+            }
 
             // Salto com W (duplo salto)
             if (Input.GetKeyDown(KeyCode.W) && jumpCount < maxJumps)
             {
-                // Reseta a velocidade vertical para garantir um salto consistente
                 rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
                 jumpCount++;
             }
 
-            // Flip do sprite conforme o lado
+            // Flip do sprite
             if (spriteRenderer != null)
             {
                 if (move > 0.05f)
-                    spriteRenderer.flipX = false; // direita
+                    spriteRenderer.flipX = false;
                 else if (move < -0.05f)
-                    spriteRenderer.flipX = true;  // esquerda
+                    spriteRenderer.flipX = true;
             }
         }
         else
         {
             // 4. A defender → Para o movimento horizontal
             rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
-            move = 0f; // Para que a animação "Speed" seja zero
+            move = 0f;
         }
 
         // 5. Atualizar Animator
         if (anim)
         {
-            // Se estiver a defender, o Speed deve ser 0 para animação de defesa estática
             anim.SetFloat("Speed", isDefending ? 0f : Mathf.Abs(move));
             anim.SetBool("Grounded", grounded);
         }
@@ -160,7 +157,6 @@ public class Movement2D : MonoBehaviour
 
     void OnDrawGizmosSelected()
     {
-        // Usa o Gizmos do OverlapCircle para visualizar
         if (groundCheck != null)
         {
             Gizmos.color = grounded ? Color.green : Color.red;
@@ -168,16 +164,18 @@ public class Movement2D : MonoBehaviour
         }
     }
 
-    // --- Lógica de Colisão (Melhorada para evitar problemas de GroundCheck) ---
+    // --- Lógica de Colisão ---
 
-    // Redundância de chão via colisão (Corrige o uso de linearVelocity para velocity)
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        // Verifica se a camada colide com o 'groundLayer'
         if (((1 << collision.gameObject.layer) & groundLayer) != 0)
         {
-            grounded = true;
-            jumpCount = 0;
+            // Apenas reseta se o ponto de contacto estiver por baixo do jogador
+            if (collision.GetContact(0).normal.y > 0.5f)
+            {
+                grounded = true;
+                jumpCount = 0;
+            }
         }
     }
 
@@ -185,10 +183,10 @@ public class Movement2D : MonoBehaviour
     {
         if (((1 << collision.gameObject.layer) & groundLayer) != 0)
         {
-            // Se o jogador estiver a cair (velocidade vertical negativa), considera que saiu do chão.
             if (rb != null && rb.linearVelocity.y < 0)
             {
-                grounded = false;
+                // Se estiver a cair, sai do chão
+                // Mantemos o valor do OverlapCircle (Update) como o principal árbitro
             }
         }
     }
