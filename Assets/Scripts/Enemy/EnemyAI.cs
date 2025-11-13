@@ -22,14 +22,14 @@ public class EnemyAI : MonoBehaviourPunCallbacks
 
     [Header("Geral")]
     public AIState currentState;
-    public float chaseRange;
-    public float attackRange;
-    public float moveSpeed;
+    public float chaseRange = 8f;
+    public float attackRange = 1.5f;
+    public float moveSpeed = 3f;
 
     [Header("Patrulha")]
-    public float patrolSpeed;
-    public float edgeCheckDistance;
-    public float wallCheckDistancePatrol;
+    public float patrolSpeed = 1.5f;
+    public float edgeCheckDistance = 5f;
+    public float wallCheckDistancePatrol = 0.5f;
     public Transform groundCheckPoint;
     public LayerMask groundLayer;
 
@@ -40,10 +40,10 @@ public class EnemyAI : MonoBehaviourPunCallbacks
     public float wallCheckDistanceChase = 0.5f;
 
     [Header("Combate / Knockback")]
-    public float knockbackForce;
-    public float stunTime;
-    public int attackDamage;            // Dano que o inimigo causa
-    public float attackCooldown;      // Tempo entre ataques do inimigo
+    public float knockbackForce = 15f;
+    public float stunTime = 0.5f;
+    public int attackDamage = 7;            // Dano que o inimigo causa
+    public float attackCooldown = 1.5f;       // Tempo entre ataques do inimigo
 
     // NOVA VARIÁVEL: Define a distância exata que o ponto de ataque deve estar do centro.
     public float attackOffsetDistance = 0.5f;
@@ -252,6 +252,11 @@ public class EnemyAI : MonoBehaviourPunCallbacks
     {
         // O Physics2D.OverlapCircleAll usa a posição GLOBAL do attackPoint.
         Collider2D[] hitPlayers = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, playerLayer);
+
+        if (hitPlayers.Length == 0) // O Debug.LogError deveria aparecer aqui.
+        {
+            Debug.LogError($"[ERRO DE HIT] OverlapCircle não detetou NINGUÉM. Pos: {attackPoint.position}, Raio: {attackRange}, Layer: {playerLayer.value}");
+        }
 
         foreach (Collider2D player in hitPlayers)
         {

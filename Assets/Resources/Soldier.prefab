@@ -179,7 +179,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62899f850307741f2a39c98a8b639597, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_Actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}
+  m_Actions: {fileID: 0}
   m_NotificationBehavior: 0
   m_UIInputModule: {fileID: 0}
   m_DeviceLostEvent:
@@ -387,7 +387,7 @@ GameObject:
   - component: {fileID: 6165639168088884306}
   - component: {fileID: 7935735678930373152}
   - component: {fileID: 3299946973090286454}
-  m_Layer: 5
+  m_Layer: 7
   m_Name: CountdownText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -527,7 +527,7 @@ GameObject:
   - component: {fileID: 3149089365557184293}
   - component: {fileID: 2411068745142178634}
   - component: {fileID: 8087985657373833023}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Camera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
@@ -928,7 +928,7 @@ GameObject:
   - component: {fileID: 3206697270659085744}
   - component: {fileID: 9088636836831211498}
   - component: {fileID: 622895528234739839}
-  m_Layer: 5
+  m_Layer: 7
   m_Name: Health
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1003,7 +1003,7 @@ GameObject:
   - component: {fileID: 8708055025907033569}
   - component: {fileID: 732986857557084534}
   - component: {fileID: 7250580242343582799}
-  m_Layer: 5
+  m_Layer: 7
   m_Name: HealthBG
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1080,7 +1080,7 @@ GameObject:
   - component: {fileID: 8178697680685288905}
   - component: {fileID: 7264599633082073286}
   - component: {fileID: 49088112294760505}
-  m_Layer: 5
+  m_Layer: 7
   m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1183,7 +1183,7 @@ GameObject:
   - component: {fileID: 6050456394502486480}
   - component: {fileID: 3283410258006130191}
   - component: {fileID: 3430700335996069597}
-  m_Layer: 5
+  m_Layer: 7
   m_Name: DefenseIcon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1259,7 +1259,7 @@ GameObject:
   - component: {fileID: 6508839326860794909}
   - component: {fileID: 7637169194961044974}
   - component: {fileID: 2399450394476314347}
-  m_Layer: 5
+  m_Layer: 7
   m_Name: DefenseCooldownText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1425,7 +1425,7 @@ GameObject:
   m_Component:
   - component: {fileID: 500981701977581711}
   - component: {fileID: 7434430773278954710}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: NameTagParente
   m_TagString: Untagged
   m_Icon: {fileID: 0}
