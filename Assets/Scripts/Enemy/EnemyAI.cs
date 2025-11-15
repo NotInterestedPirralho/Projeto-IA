@@ -28,6 +28,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
 
     [Header("Patrulha")]
     public float patrolSpeed = 1.5f;
+    public float patrolDistance = 5f; // <-- ADICIONADO
     public float edgeCheckDistance = 5f;
     public float wallCheckDistancePatrol = 0.5f;
     public Transform groundCheckPoint;
@@ -40,16 +41,16 @@ public class EnemyAI : MonoBehaviourPunCallbacks
     public float wallCheckDistanceChase = 0.5f;
 
     [Header("Combate / Knockback")]
-    public float knockbackForce = 10f;          // Força de knockback que o inimigo APLICA
-    public float stunTime = 0.5f;               // Duração do stun (pode ser usado como duração do knockback)
-    public int attackDamage = 7;                // Dano que o inimigo causa
-    public float attackCooldown = 1.5f;         // Tempo entre ataques do inimigo
+    public float knockbackForce = 10f;      // Força de knockback que o inimigo APLICA
+    public float stunTime = 0.5f;           // Duração do stun (pode ser usado como duração do knockback)
+    public int attackDamage = 7;            // Dano que o inimigo causa
+    public float attackCooldown = 1.5f;     // Tempo entre ataques do inimigo
 
     // Variável: Define a distância exata que o ponto de ataque deve estar do centro.
     public float attackOffsetDistance = 0.5f;
 
-    public Transform attackPoint;               // Ponto de origem do ataque do inimigo (filho do Enemy)
-    public LayerMask playerLayer;               // Camada do Jogador
+    public Transform attackPoint;           // Ponto de origem do ataque do inimigo (filho do Enemy)
+    public LayerMask playerLayer;           // Camada do Jogador
 
     // --- Propriedades para acesso externo (EnemyHealth) ---
     // (Estas propriedades devem ser usadas se o inimigo for atacado)
@@ -63,6 +64,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
     private float nextAttackTime = 0f;
     private PhotonView photonView;
     private int direction = 1; // 1 (Direita), -1 (Esquerda) - Usado apenas para Patrulha
+    private Vector2 patrolOrigin; // <-- ADICIONADO
     private bool isGrounded = false;
     private SpriteRenderer spriteRenderer;
 
@@ -80,6 +82,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
         if (PhotonNetwork.IsMasterClient)
         {
             currentState = AIState.Patrol;
+            patrolOrigin = transform.position; // <-- ADICIONADO
 
             // Tenta encontrar o player na cena
             GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
@@ -120,6 +123,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
 
     // --- 5. LÓGICA DE ESTADOS ---
 
+    // <-- FUNÇÃO HANDLEPATROL COMPLETAMENTE MODIFICADA -->
     void HandlePatrol()
     {
         rb.linearVelocity = new Vector2(patrolSpeed * direction, rb.linearVelocity.y);
@@ -127,6 +131,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
         Vector3 checkPos = groundCheckPoint.position;
         Vector2 checkDir = new Vector2(direction, 0);
 
+        // Raycast para Abismo (Edge)
         RaycastHit2D edgeHit = Physics2D.Raycast(
             checkPos + new Vector3(direction * wallCheckDistancePatrol, 0, 0),
             Vector2.down,
@@ -134,6 +139,7 @@ public class EnemyAI : MonoBehaviourPunCallbacks
             groundLayer
         );
 
+        // Raycast para Parede (Wall)
         RaycastHit2D wallHit = Physics2D.Raycast(
             transform.position,
             checkDir,
@@ -141,10 +147,38 @@ public class EnemyAI : MonoBehaviourPunCallbacks
             groundLayer
         );
 
-        if (edgeHit.collider == null || wallHit.collider != null)
+        // --- LÓGICA DE INVERSÃO MODIFICADA ---
+
+        bool atWallOrEdge = (edgeHit.collider == null || wallHit.collider != null);
+
+        if (atWallOrEdge)
         {
+            // 1. Lógica Original: Bateu na parede ou abismo, vira.
             direction *= -1;
         }
+        else
+        {
+            // 2. Lógica Nova: Se não bateu em nada, verifica a distância.
+            float distanceToOrigin = Mathf.Abs(transform.position.x - patrolOrigin.x);
+
+            if (distanceToOrigin >= patrolDistance)
+            {
+                // Estamos no limite da patrulha.
+                // Força a virar de volta para a origem.
+
+                // Se estamos à direita da origem (pos.x > origin.x) E a andar para a direita (dir == 1)
+                if (transform.position.x > patrolOrigin.x && direction == 1)
+                {
+                    direction = -1; // Vira para a esquerda (para a origem)
+                }
+                // Se estamos à esquerda da origem (pos.x < origin.x) E a andar para a esquerda (dir == -1)
+                else if (transform.position.x < patrolOrigin.x && direction == -1)
+                {
+                    direction = 1; // Vira para a direita (para a origem)
+                }
+            }
+        }
+        // --- FIM DA LÓGICA DE INVERSÃO ---
 
         FlipSprite(direction);
 
@@ -270,8 +304,8 @@ public class EnemyAI : MonoBehaviourPunCallbacks
                     RpcTarget.All,
                     finalDamage,
                     photonView.ViewID,
-                    knockbackForce,         // Força de Knockback que o inimigo APLICA
-                    stunTime                // Duração do Knockback (usa o stunTime como proxy)
+                    knockbackForce,      // Força de Knockback que o inimigo APLICA
+                    stunTime             // Duração do Knockback (usa o stunTime como proxy)
                 );
 
                 Debug.Log($"Inimigo atacou {player.name} com {finalDamage} de dano! Enviou knockback: {knockbackForce}");
@@ -344,21 +378,41 @@ public class EnemyAI : MonoBehaviourPunCallbacks
         }
     }
 
+    // <-- FUNÇÃO ONDRAWGIZMOS MODIFICADA -->
     void OnDrawGizmosSelected()
     {
+        // Gizmo de Ataque (Original)
         if (attackPoint != null)
         {
             Gizmos.color = Color.magenta;
             Gizmos.DrawWireSphere(attackPoint.position, attackRange);
         }
 
+        // Gizmo de Perseguição (Original)
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, chaseRange);
 
+        // Gizmo de Linha de Visão (Original)
         if (playerTarget != null)
         {
             Gizmos.color = CanSeePlayer() ? Color.green : Color.red;
             Gizmos.DrawLine(transform.position, playerTarget.position);
         }
+
+        // --- NOVO GIZMO PARA PATRULHA ---
+        Gizmos.color = Color.cyan;
+        // Se o jogo está a correr, usa a 'patrolOrigin' guardada. Se não, usa a posição atual no editor.
+        Vector3 patrolStartPoint = Application.isPlaying ? patrolOrigin : transform.position;
+
+        Vector3 leftPoint = patrolStartPoint + Vector3.left * patrolDistance;
+        Vector3 rightPoint = patrolStartPoint + Vector3.right * patrolDistance;
+
+        // Desenha a linha de patrulha (ajustada ao Y do inimigo para ser visível)
+        leftPoint.y = transform.position.y;
+        rightPoint.y = transform.position.y;
+
+        Gizmos.DrawLine(leftPoint, rightPoint);
+        Gizmos.DrawWireSphere(leftPoint, 0.2f);
+        Gizmos.DrawWireSphere(rightPoint, 0.2f);
     }
 }
