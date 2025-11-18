@@ -137,6 +137,22 @@ public class Health : MonoBehaviourPunCallbacks
     {
         Debug.Log($"{gameObject.name} morreu!");
 
+        // === SÓ O JOGADOR LOCAL MOSTRA O MENU DE MORTE ===
+        if (view.IsMine)
+        {
+            // Procura um DeathMenu na cena e mostra-o
+            DeathMenu deathMenu = FindObjectOfType<DeathMenu>();
+            if (deathMenu != null)
+            {
+                deathMenu.Show();
+            }
+            else
+            {
+                Debug.LogWarning("Health: Não encontrei nenhum DeathMenu na cena.");
+            }
+        }
+
+        // A partir daqui é a lógica que já tinhas
         if (!view.IsMine) return;
 
         // 1. Atualiza a contagem de Mortes (Deaths) no Photon
@@ -146,9 +162,9 @@ public class Health : MonoBehaviourPunCallbacks
         currentDeaths++;
 
         Hashtable props = new Hashtable
-        {
-            { "Deaths", currentDeaths }
-        };
+    {
+        { "Deaths", currentDeaths }
+    };
         view.Owner.SetCustomProperties(props);
 
         // 2. Notificar o atacante (para KillConfirmed)
@@ -157,7 +173,6 @@ public class Health : MonoBehaviourPunCallbacks
             PhotonView attackerView = PhotonView.Find(attackerViewID);
             if (attackerView != null)
             {
-                // Chama o método KillConfirmed no CombatSystem2D do atacante.
                 attackerView.RPC("KillConfirmed", attackerView.Owner);
             }
         }
@@ -165,6 +180,7 @@ public class Health : MonoBehaviourPunCallbacks
         // 3. Destrói o objeto na rede
         PhotonNetwork.Destroy(gameObject);
     }
+
 
     [PunRPC]
     public void Heal(int amount)
