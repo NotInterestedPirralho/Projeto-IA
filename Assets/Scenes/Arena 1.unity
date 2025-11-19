@@ -5232,7 +5232,7 @@ MonoBehaviour:
   m_VertexBufferAutoSizeReduction: 0
   m_useMaxVisibleDescender: 1
   m_pageToDisplay: 1
-  m_margin: {x: 0, y: 0, z: -21.408081, w: 0}
+  m_margin: {x: -20.963531, y: 0, z: -21.408081, w: 0}
   m_isUsingLegacyAnimationComponent: 0
   m_isVolumetricText: 0
   m_hasFontAssetChanged: 0
@@ -7028,6 +7028,30 @@ PrefabInstance:
     - target: {fileID: 4414858705285102287, guid: b26bdf7ae8fdc1d4a88f45b2e406ace3, type: 3}
       propertyPath: m_Name
       value: GameChat
+      objectReference: {fileID: 0}
+    - target: {fileID: 5335771197765646142, guid: b26bdf7ae8fdc1d4a88f45b2e406ace3, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 200
+      objectReference: {fileID: 0}
+    - target: {fileID: 5335771197765646142, guid: b26bdf7ae8fdc1d4a88f45b2e406ace3, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 150
+      objectReference: {fileID: 0}
+    - target: {fileID: 5335771197765646142, guid: b26bdf7ae8fdc1d4a88f45b2e406ace3, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -150
+      objectReference: {fileID: 0}
+    - target: {fileID: 6096820749151124223, guid: b26bdf7ae8fdc1d4a88f45b2e406ace3, type: 3}
+      propertyPath: m_SizeDelta.x
+      value: 200
+      objectReference: {fileID: 0}
+    - target: {fileID: 6096820749151124223, guid: b26bdf7ae8fdc1d4a88f45b2e406ace3, type: 3}
+      propertyPath: m_SizeDelta.y
+      value: 30
+      objectReference: {fileID: 0}
+    - target: {fileID: 6096820749151124223, guid: b26bdf7ae8fdc1d4a88f45b2e406ace3, type: 3}
+      propertyPath: m_AnchoredPosition.y
+      value: -180
       objectReference: {fileID: 0}
     - target: {fileID: 6988018275069845211, guid: b26bdf7ae8fdc1d4a88f45b2e406ace3, type: 3}
       propertyPath: sceneViewId

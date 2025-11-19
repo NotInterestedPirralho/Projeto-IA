@@ -6,40 +6,48 @@ public class FaceObjectT : MonoBehaviour
 
     void Start()
     {
-        // 1. Encontra a câmara principal apenas uma vez
         if (Camera.main != null)
         {
             mainCameraTransform = Camera.main.transform;
         }
         else
         {
-            Debug.LogError("FaceObjectT: Nenhuma câmara com a tag 'MainCamera' encontrada. O script foi desativado.");
+            Debug.LogError("FaceObjectT: Nenhuma câmara com a tag 'MainCamera' encontrada.");
             enabled = false;
         }
     }
 
     void Update()
     {
-        // Garante que a referência da câmara é válida
         if (mainCameraTransform != null)
         {
-            // --- CÓDIGO 2D RECOMENDADO ---
+            // --- CÓDIGO 2D CORRIGIDO PARA EVITAR INVERSÃO ---
 
-            // 1. Calcular a diferença de rotação necessária.
-            // O objetivo é fazer a rotação do objeto ser a mesma que a rotação da câmara,
-            // garantindo que o objeto está sempre perpendicular ao ponto de vista.
+            // 1. Obtém a rotação da câmara no espaço global.
+            Quaternion cameraRotation = mainCameraTransform.rotation;
 
-            // Usamos a rotação da câmara (Camera.main.transform.rotation)
-            // e aplicamos ao nosso objeto.
+            // 2. Cria uma nova rotação que é a rotação da câmara, mas com X e Y bloqueados a 0.
+            // A rotação da câmara 2D é tipicamente apenas um Quaternion com Z a 0, 
+            // mas o uso de Quaternion.identity (ou Quaternion.Euler(0, 0, 0)) no 
+            // espaço local corrige frequentemente o problema de inversão do texto.
 
-            // Para um efeito Billboard completo (sempre virado para o ecrã):
-            transform.rotation = mainCameraTransform.rotation;
+            // Tentativa 1 (Mais simples e muitas vezes resolve a inversão):
+            transform.rotation = Quaternion.identity;
 
-            // Se esta linha for a única responsável pelo erro:
-            // transform.LookAt(Camera.main.transform); // Linha 7 original
+            // Se o texto parecer estar a "cair" ou a não estar fixo, 
+            // usa esta linha em vez da anterior:
+            // transform.rotation = Quaternion.Euler(0f, 0f, 0f); 
 
-            // A sua nova linha 7 (e a mais eficiente) deve ser:
+            // Se o teu objetivo for ser um BILLBOARD COMPLETO (virado para o ecrã):
             // transform.rotation = mainCameraTransform.rotation;
+
+            // Mas, se o teu texto está invertido (180 graus no eixo Y), 
+            // é provável que a rotação da câmara não seja perfeita (0, 0, 0)
+            // na perspetiva local do objeto.
+
+            // O uso de Quaternion.identity força o objeto a não ter rotação
+            // local, o que é o estado correto para texto num jogo 2D, a menos que 
+            // a câmara principal esteja a rodar.
         }
     }
 }
