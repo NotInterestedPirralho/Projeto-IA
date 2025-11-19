@@ -24,7 +24,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
     // --- Configurações de Tempo ---
     private const int MAX_PLAYERS = 4;
-    private const float WAIT_TIME_FOR_SECOND_PLAYER = 90f; // 90 segundos para 2+ jogadores
+    private const float WAIT_TIME_FOR_SECOND_PLAYER = 10f; // 90 segundos para 2+ jogadores
     private const float WAIT_TIME_FULL_ROOM = 5f;          // 5 segundos se a sala estiver cheia (4/4)
 
     // --- Variáveis de Sincronização e Estado ---
