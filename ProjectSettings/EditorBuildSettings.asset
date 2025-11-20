@@ -41,6 +41,9 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Scenes/TrainingGround4.unity
     guid: 56f7d38b40d849e438f55c60cc16eb52
+  - enabled: 1
+    path: Assets/Scenes/Arena 3.unity
+    guid: fedbdc4deaa0676449f74340d697d776
   m_configObjects:
     com.unity.input.settings: {fileID: 11400000, guid: e5f630ddf5c12fd41b0f77b48b33ecad, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 2bcd2660ca9b64942af0de543d8d7100, type: 3}

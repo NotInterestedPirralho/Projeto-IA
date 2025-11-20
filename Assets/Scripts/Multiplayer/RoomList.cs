@@ -14,8 +14,8 @@ public class RoomList : MonoBehaviourPunCallbacks
     public Transform roomListParent;
     public GameObject roomListItemPrefab;
 
-    // !!! NOVAS VARIÁVEIS ADICIONADAS !!!
-    [Header("UI (Painéis)")]
+    // !!! NOVAS VARIï¿½VEIS ADICIONADAS !!!
+    [Header("UI (Painï¿½is)")]
     public GameObject lobbyPanel; // O painel "Choose a game"
     public GameObject createRoomPanel; // O painel "Pick a room name"
     // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -30,7 +30,7 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     public void CreateRoomByIndex(int sceneIndex)
     {
-        // Esta função está perfeita para os teus botões "Create Room in Arena 1/2"
+        // Esta funï¿½ï¿½o estï¿½ perfeita para os teus botï¿½es "Create Room in Arena 1/2"
         JoinRoomByName(cachedRoomNameToCreate, sceneIndex);
     }
 
@@ -41,8 +41,8 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     IEnumerator Start()
     {
-        // Boa prática: garantir que o painel de lobby está visível
-        // e o de criar sala está escondido ao iniciar.
+        // Boa prï¿½tica: garantir que o painel de lobby estï¿½ visï¿½vel
+        // e o de criar sala estï¿½ escondido ao iniciar.
         if (lobbyPanel != null) lobbyPanel.SetActive(true);
         if (createRoomPanel != null) createRoomPanel.SetActive(false);
 
@@ -67,7 +67,7 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     public override void OnRoomListUpdate(List<RoomInfo> roomList)
     {
-        // ... (o resto desta função está igual e correto) ...
+        // ... (o resto desta funï¿½ï¿½o estï¿½ igual e correto) ...
         if (cachedRoomList.Count <= 0)
         {
             cachedRoomList = roomList;
@@ -102,7 +102,7 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     void UpdateUI()
     {
-        // ... (o resto desta função está igual e correto) ...
+        // ... (o resto desta funï¿½ï¿½o estï¿½ igual e correto) ...
         foreach (Transform roomItem in roomListParent)
         {
             Destroy(roomItem.gameObject);
@@ -142,7 +142,7 @@ public class RoomList : MonoBehaviourPunCallbacks
         PlayerPrefs.SetString("RoomNameToJoin", _name);
 
         // Esta linha pode dar problemas se o script estiver no mesmo objeto
-        // que os painéis. Se o menu desaparecer, remove a linha abaixo.
+        // que os painï¿½is. Se o menu desaparecer, remove a linha abaixo.
         // gameObject.SetActive(false); 
 
         SceneManager.LoadScene(_sceneIndex);
@@ -150,7 +150,7 @@ public class RoomList : MonoBehaviourPunCallbacks
     }
 
 
-    // Esta função é para o "Back" do Lobby -> Menu Principal
+    // Esta funï¿½ï¿½o ï¿½ para o "Back" do Lobby -> Menu Principal
     public void GoBackToMainMenu()
     {
         if (PhotonNetwork.IsConnected)
@@ -161,12 +161,12 @@ public class RoomList : MonoBehaviourPunCallbacks
     }
 
     //
-    // !!! NOVAS FUNÇÕES ADICIONADAS !!!
+    // !!! NOVAS FUNï¿½ï¿½ES ADICIONADAS !!!
     //
 
     /**
-     * Esta função é para o botão "Create a room" (no LobbyPanel).
-     * Esconde o Lobby e mostra o painel de criação de sala.
+     * Esta funï¿½ï¿½o ï¿½ para o botï¿½o "Create a room" (no LobbyPanel).
+     * Esconde o Lobby e mostra o painel de criaï¿½ï¿½o de sala.
      */
     public void ShowCreateRoomPanel()
     {
@@ -175,8 +175,8 @@ public class RoomList : MonoBehaviourPunCallbacks
     }
 
     /**
-     * Esta função é para o botão "Back" (no CreateRoomPanel).
-     * Esconde o painel de criação e volta a mostrar o Lobby.
+     * Esta funï¿½ï¿½o ï¿½ para o botï¿½o "Back" (no CreateRoomPanel).
+     * Esconde o painel de criaï¿½ï¿½o e volta a mostrar o Lobby.
      */
     public void GoBackToLobbyPanel()
     {
