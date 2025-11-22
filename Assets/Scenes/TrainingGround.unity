@@ -2456,6 +2456,10 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 968156895377731370, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
+      propertyPath: m_IsActive
+      value: 1
+      objectReference: {fileID: 0}
     - target: {fileID: 1302752626657400358, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
       propertyPath: m_text
       value: Arena 2
@@ -2464,13 +2468,30 @@ PrefabInstance:
       propertyPath: m_RenderMode
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 2151893460579126616, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
+      propertyPath: m_AnchoredPosition.x
+      value: -56.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 3653459363896970796, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
+      propertyPath: m_text
+      value: "Bem vindo Guerreiro a sua jornada come\xE7a aqui alcance 400 pontos
+        para avan\xE7ar na sua jornada!!"
+      objectReference: {fileID: 0}
+    - target: {fileID: 3653459363896970796, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
+      propertyPath: m_margin.z
+      value: -206.83899
+      objectReference: {fileID: 0}
     - target: {fileID: 4760759316104611353, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
       propertyPath: nextLevelSceneName
       value: TrainingGround2
       objectReference: {fileID: 0}
     - target: {fileID: 5048578580719735310, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
       propertyPath: scoreToWin
-      value: 100
+      value: 400
+      objectReference: {fileID: 0}
+    - target: {fileID: 6166007977396806821, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
+      propertyPath: m_IsActive
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 6624541338861994163, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
       propertyPath: m_Pivot.x
@@ -2551,6 +2572,10 @@ PrefabInstance:
     - target: {fileID: 6624541338861994163, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8066050543658430552, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
+      propertyPath: m_IsActive
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: 8504813439773849341, guid: 149abd19ac8b3cd4e9490d06153fe1f1, type: 3}
       propertyPath: m_Name
