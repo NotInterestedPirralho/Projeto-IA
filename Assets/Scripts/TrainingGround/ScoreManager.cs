@@ -8,7 +8,7 @@ public class ScoreManager : MonoBehaviour
     public static ScoreManager instance;
 
     [Header("Configuração da Vitória")]
-    public int scoreToWin = 700;
+    public int scoreToWin = 700; // Este valor tu mudas no Inspector de cada Arena!
     public GameObject winPanel;
 
     private bool gameEnded = false;
@@ -18,13 +18,13 @@ public class ScoreManager : MonoBehaviour
     {
         if (instance == null) instance = this;
 
-        // --- SOLUÇÃO NUCLEAR ---
-        // O Awake corre ANTES de tudo. 
-        // Força bruta para desligar o painel, independentemente de como ele foi salvo.
+        // Sempre que a cena carrega, garantimos que o jogo se mexe.
+        Time.timeScale = 1f;
+
+        // Desliga o painel à força no início
         if (winPanel != null)
         {
             winPanel.SetActive(false);
-            Debug.Log("ScoreManager: WinPanel desligado no Awake à força.");
         }
     }
 
@@ -33,27 +33,20 @@ public class ScoreManager : MonoBehaviour
         gameEnded = false;
         canCheckWin = false;
 
-        // Segurança extra: espera 2 segundos antes de sequer OLHAR para o score
-        Debug.Log("ScoreManager: A aguardar sincronização...");
+        // Espera inicial para sincronizar score
         yield return new WaitForSeconds(2f);
 
         canCheckWin = true;
-        Debug.Log("ScoreManager: Pronto para verificar vitórias.");
     }
 
     private void Update()
     {
-        // Se ainda estamos no tempo de espera (Start), não fazemos nada
         if (!canCheckWin || gameEnded) return;
 
-        // Só verificamos se estivermos mesmo ligados
         if (PhotonNetwork.IsConnectedAndReady && PhotonNetwork.InRoom)
         {
             int networkScore = PhotonNetwork.LocalPlayer.GetScore();
 
-            // Se o Photon ainda tiver o score antigo (700) por erro de sincronização,
-            // o TGRoomManager deve resetá-lo em breve.
-            // Mas se o score for alto E já passou o tempo de espera, então ganhámos.
             if (networkScore >= scoreToWin)
             {
                 WinGame();
@@ -64,9 +57,14 @@ public class ScoreManager : MonoBehaviour
     void WinGame()
     {
         gameEnded = true;
-        Debug.Log("VITÓRIA ALCANÇADA! Score: " + PhotonNetwork.LocalPlayer.GetScore());
+        Debug.Log("VITÓRIA! Jogo Pausado.");
 
         if (winPanel != null)
             winPanel.SetActive(true);
+
+        // --- CORREÇÃO 2: CONGELAR O TEMPO ---
+        // Isto faz com que inimigos, física e animações parem.
+        // O UI (botões) continua a funcionar.
+        Time.timeScale = 0f;
     }
 }
