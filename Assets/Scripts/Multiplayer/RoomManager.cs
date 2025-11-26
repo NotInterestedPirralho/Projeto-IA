@@ -1,8 +1,12 @@
+// roomManager
 using UnityEngine;
 using Photon.Pun;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 using Photon.Realtime;
 using UnityEngine.SceneManagement;
+
+// Permite acessar SCM.selectedCharacter diretamente
+using static SCM; 
 
 public class RoomManager : MonoBehaviourPunCallbacks
 {
@@ -18,12 +22,12 @@ public class RoomManager : MonoBehaviourPunCallbacks
     private string sceneToLoadOnLeave = "";
 
     [Header("Player and Spawn")]
-    public GameObject player; // O Prefab do jogador (deve estar na pasta Resources)
+    // REMOVIDO: public GameObject player; // Substituído por SCM.selectedCharacter
     public Transform[] spawnPoints; // Array com posições de spawn no mapa
 
     [Header("UI References")]
-    public GameObject roomCam;     // A câmara usada no lobby/espera (desativada ao começar)
-    public GameObject nameUI;      // UI para inserir o nome (Menu Principal)
+    public GameObject roomCam;     // A câmara usada no lobby/espera (desativada ao começar)
+    public GameObject nameUI;      // UI para inserir o nome (Menu Principal)
     public GameObject connectigUI; // UI de 'A Conectar...'
 
     [Header("Room Info")]
@@ -213,28 +217,38 @@ public class RoomManager : MonoBehaviourPunCallbacks
     // Função chamada pelo LobbyManager para criar o boneco
     public void RespawnPlayer()
     {
-        // Verifica vidas restantes
+        // 1. Verifica vidas restantes
         int respawnsLeft = GetRespawnCount(PhotonNetwork.LocalPlayer);
 
-        // Verificação de segurança dos pontos de spawn
         if (spawnPoints == null || spawnPoints.Length == 0)
         {
             Debug.LogError("ERRO: Array 'spawnPoints' está vazio no RoomManager!");
             return;
         }
+        
+        // ** INTEGRANDO A SELEÇÃO DE PERSONAGEM **
+        string characterToSpawnName = SCM.selectedCharacter;
+
+        // Validação se o personagem foi escolhido no script SCM
+        if (string.IsNullOrEmpty(characterToSpawnName) || characterToSpawnName == "None")
+        {
+            Debug.LogError("ERRO: Personagem não selecionado. Não é possível fazer o spawn. Por favor, selecione um personagem na cena anterior.");
+            return;
+        }
+        // ****************************************
 
         // Se tiver vidas (ou spawn inicial)
-        if (respawnsLeft >= 0 && player != null)
+        if (respawnsLeft >= 0)
         {
             // --- Lógica de seleção de Ponto de Spawn ---
-            // Tenta pegar um ponto baseado no ID do jogador para evitar sobreposição inicial
             int playerIndex = GetPlayerIndex(PhotonNetwork.LocalPlayer);
             int spawnIndex = playerIndex % spawnPoints.Length; // Garante que não sai do limite do array
 
             Transform spawnPoint = spawnPoints[spawnIndex];
 
-            // Instancia o jogador na rede
-            GameObject _player = PhotonNetwork.Instantiate(player.name, spawnPoint.position, Quaternion.identity);
+            // Instancia o jogador na rede usando o NOME DO PERSONAGEM (Ex: "Soldier")
+            // O Prefab com este nome deve estar na pasta Resources.
+            GameObject _player = PhotonNetwork.Instantiate(characterToSpawnName, spawnPoint.position, Quaternion.identity);
 
             // Configurações locais
             _player.GetComponent<PlayerSetup>()?.IsLocalPlayer();
@@ -246,7 +260,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
                 PhotonNetwork.LocalPlayer.NickName = nickName;
             }
 
-            Debug.Log($"Spawn realizado no ponto {spawnIndex}. Vidas restantes: {respawnsLeft}");
+            Debug.Log($"Spawn do personagem '{characterToSpawnName}' realizado no ponto {spawnIndex}. Vidas restantes: {respawnsLeft}");
         }
         else
         {
