@@ -1,3 +1,4 @@
+//movement
 using UnityEngine;
 using Photon.Pun;
 using System.Collections; // Necessário para as Coroutines
@@ -133,6 +134,26 @@ public class Movement2D : MonoBehaviour
             );
         }
 
+        // LÓGICA DE PAUSA DO JOGO MULTIPLAYER (NOVA ADIÇÃO)
+        // Se o menu de pausa local estiver aberto, ignoramos TODO o input de movimento.
+        // O Knockback tem prioridade sobre o Menu.
+        if (PMMM.IsPausedLocally)
+        {
+            // Opcional: Garante que a personagem para imediatamente se pausar em movimento.
+            if (rb != null)
+            {
+                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+            }
+
+            if (anim)
+            {
+                anim.SetFloat("Speed", 0f);
+                anim.SetBool("Grounded", grounded);
+                anim.SetBool("IsSprinting", false);
+            }
+            return; // IGNORA O RESTO DA LÓGICA DE INPUT E MOVIMENTO
+        }
+        
         // LÓGICA DE KNOCKBACK
         if (isKnockedBack)
         {
