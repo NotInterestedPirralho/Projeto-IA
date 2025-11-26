@@ -2,7 +2,7 @@ using Photon.Pun;
 using TMPro;
 using UnityEngine;
 
-// Implementa IPunObservable para sincronizaÁ„o de dados de animaÁ„o
+// Implementa IPunObservable para sincroniza√ß√£o de dados de anima√ß√£o
 public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
 {
     public Movement2D movement;
@@ -11,11 +11,11 @@ public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
     public string nickname;
     public TextMeshPro nicknameText; // Usando TextMeshPro para o Nickname flutuante
 
-    // NOVO: ReferÍncias de sincronizaÁ„o
+    // Refer√™ncias de sincroniza√ß√£o
     private PhotonView photonView;
     private Animator anim;
 
-    // Vari·veis usadas para interpolar animaÁ„o em clientes remotos
+    // Vari√°veis usadas para interpolar anima√ß√£o em clientes remotos
     private float syncSpeed;
     private bool syncGrounded;
 
@@ -24,20 +24,19 @@ public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
         photonView = GetComponent<PhotonView>();
         anim = GetComponent<Animator>();
 
-        // Apenas o cliente local deve processar o input, ativar a c‚mara, etc.
+        // Apenas o cliente local deve processar o input, ativar a c√¢mara, etc.
         if (photonView.IsMine)
         {
-            // Ativa o controle e a c‚mara
+            // Ativa o controle e a c√¢mara
             IsLocalPlayer();
         }
         else // Cliente Remoto
         {
-            // Desativa o controle e o combate nos clientes remotos,
-            // a posiÁ„o È sincronizada pelo PhotonRigidbody2DView
+            // Desativa o controle e o combate nos clientes remotos
             movement.enabled = false;
             if (combat != null) combat.enabled = false;
 
-            // Certifique-se de que a c‚mara n„o est· ativa em jogadores remotos
+            // Certifique-se de que a c√¢mara n√£o est√° ativa em jogadores remotos
             if (camara != null) camara.SetActive(false);
         }
     }
@@ -48,13 +47,12 @@ public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
         // Ativa os scripts de input
         movement.enabled = true;
 
-        // Ativa a c‚mara
+        // Ativa a c√¢mara
         if (camara != null)
         {
             camara.SetActive(true);
 
-            // L”GICA DO SCRIPT ORIGINAL INTEGRADA AQUI:
-            // Inicia o zoom din‚mico quando a c‚mara for ativada
+            // Inicia o zoom din√¢mico quando a c√¢mara for ativada
             var zoomDynamic = camara.GetComponent<CameraDynamicZoom>();
             if (zoomDynamic != null)
                 zoomDynamic.enabled = true;
@@ -65,41 +63,46 @@ public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
             combat.enabled = true;
     }
 
-    // --- SINCRONIZA«√O DE ANIMA«√O PARA JOGADORES REMOTOS ---
+    // --- SINCRONIZA√á√ÉO DE ANIMA√á√ÉO PARA JOGADORES REMOTOS ---
 
     void Update()
     {
-        // Se n„o for o seu objeto, aplica as animaÁıes sincronizadas
+        // Se n√£o for o seu objeto, aplica as anima√ß√µes sincronizadas
         if (!photonView.IsMine && anim)
         {
             // Aplica os valores sincronizados recebidos no OnPhotonSerializeView
-            anim.SetFloat("Speed", Mathf.Abs(syncSpeed));
-            anim.SetBool("Grounded", syncGrounded);
+            // Sincroniza o par√¢metro "IsRunning" (baseado na velocidade horizontal)
+            anim.SetBool("IsRunning", Mathf.Abs(syncSpeed) > 0.1f);
+            
+            // Sincroniza o par√¢metro "IsGrounded" (ou o que usa o seu Movement2D)
+            anim.SetBool("IsGrounded", syncGrounded);
+            
+            // Nota: Se a anima√ß√£o de salto/queda usar "VerticalSpeed", precisa de o sincronizar tamb√©m.
         }
     }
 
     /// <summary>
-    /// Sincroniza o estado de animaÁ„o pela rede.
+    /// Sincroniza o estado de anima√ß√£o pela rede.
     /// </summary>
     public void OnPhotonSerializeView(PhotonStream stream, PhotonMessageInfo info)
     {
         if (stream.IsWriting)
         {
-            // --- O JOGADOR LOCAL EST¡ A ENVIAR DADOS ---
+            // --- O JOGADOR LOCAL EST√Å A ENVIAR DADOS ---
 
-            // Enviar velocidade horizontal e estado no ch„o (Propriedades do Movement2D)
+            // Enviar velocidade horizontal e estado no ch√£o (USANDO AS NOVAS PROPRIEDADES)
             stream.SendNext(movement.CurrentHorizontalSpeed);
             stream.SendNext(movement.IsGrounded);
         }
         else
         {
-            // --- O JOGADOR REMOTO EST¡ A RECEBER DADOS ---
+            // --- O JOGADOR REMOTO EST√Å A RECEBER DADOS ---
 
-            // Receber velocidade horizontal e estado no ch„o
+            // Receber velocidade horizontal e estado no ch√£o
             this.syncSpeed = (float)stream.ReceiveNext();
             this.syncGrounded = (bool)stream.ReceiveNext();
 
-            // A interpolaÁ„o (suavizaÁ„o) da posiÁ„o fÌsica È tratada pelo PhotonRigidbody2DView.
+            // A interpola√ß√£o (suaviza√ß√£o) da posi√ß√£o f√≠sica √© tratada pelo PhotonRigidbody2DView.
         }
     }
 
@@ -107,6 +110,11 @@ public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
     public void SetNickname(string _nickname)
     {
         nickname = _nickname;
-        nicknameText.text = nickname;
+        
+        // Atribui o nickname ao TextMeshPro flutuante
+        if (nicknameText != null)
+        {
+            nicknameText.text = nickname;
+        }
     }
 }

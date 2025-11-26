@@ -21,10 +21,15 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     public float defenseCooldown = 2f;
     [HideInInspector] public bool isDefending = false;
 
+    [Header("Knockback (Dano Player vs Player)")]
+    // Estes valores serão enviados para o Health.cs para o Knockback
+    public float pvpKnockbackForce = 5f; 
+    public float pvpKnockbackDuration = 0.2f;
+
     [Header("VFX")]
     public GameObject hitVFX;
 
-    // NOVO: Elementos de UI
+    // Elementos de UI
     [Header("UI Defesa")]
     public Image defenseIcon; // Ícone do shield (para alterar a transparência)
     public TextMeshProUGUI defenseText; // Texto com o tempo restante
@@ -45,7 +50,7 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     {
         anim = GetComponent<Animator>();
 
-        // NOVO: Tentar encontrar UI automaticamente (útil para pré-fabs)
+        // Tentar encontrar UI automaticamente (útil para pré-fabs)
         if (defenseIcon == null || defenseText == null)
         {
             Canvas canvas = GetComponentInChildren<Canvas>();
@@ -62,19 +67,14 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
 
     void Update()
     {
-        // NOVO: VERIFICAÇÃO DE PAUSA
-        // Bloqueia todo o input de combate se o menu de pausa estiver ativo.
-        if (PMMM.IsPausedLocally)
+        // BLOQUEIO CRUCIAL DE INPUTS
+        if (PMMM.IsPausedLocally || GameChat.IsChatOpen)
         {
-            // Se estivermos a defender e pausarmos, devemos forçar o fim da defesa.
-            // Isto garante que o jogador não fica permanentemente defendendo se pausar e sair.
             if (isDefending)
             {
                 photonView.RPC(nameof(SetDefenseState), RpcTarget.All, false);
-                // Não colocamos o cooldown aqui, pois o Update não vai correr de novo
-                // até que o jogo seja retomado, e a lógica de cooldown deve ser aplicada no ResumeGame() ou OnMouseUp.
             }
-            return; // IGNORA TODO O RESTO DA LÓGICA DE INPUT
+            return;
         }
 
         // Lógica de Ataque (Input lido apenas no jogador local)
@@ -96,24 +96,21 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
             nextDefenseTime = Time.time + defenseCooldown;
         }
 
-        // NOVO: Atualizar o estado visual do cooldown
+        // Atualizar o estado visual do cooldown (apenas UI local)
         UpdateDefenseUI();
     }
 
-    // NOVO: Implementação do método de UI
+    // Implementação do método de UI
     private void UpdateDefenseUI()
     {
-        // Só precisa de processar a UI se for o jogador local
         if (!photonView.IsMine) return;
 
         if (defenseIcon == null && defenseText == null) return;
 
         float remaining = nextDefenseTime - Time.time;
 
-        // Está em cooldown (após largar a defesa)
         if (remaining > 0f && !isDefending)
         {
-            // Diminui a opacidade do ícone para indicar "bloqueado"
             if (defenseIcon != null)
             {
                 var c = defenseIcon.color;
@@ -121,7 +118,6 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
                 defenseIcon.color = c;
             }
 
-            // Mostra o tempo restante
             if (defenseText != null)
             {
                 int seconds = Mathf.CeilToInt(remaining);
@@ -130,15 +126,13 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
         }
         else
         {
-            // Cooldown pronto ou a defender
             if (defenseIcon != null)
             {
                 var c = defenseIcon.color;
-                c.a = 1f; // Volta a 100% de opacidade
+                c.a = isDefending ? 0.7f : 1f; 
                 defenseIcon.color = c;
             }
 
-            // Remove o número
             if (defenseText != null)
                 defenseText.text = "";
         }
@@ -150,7 +144,6 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     {
         if (anim) anim.SetTrigger("Attack");
 
-        // LÓGICA AUTORITÁRIA
         if (photonView.IsMine)
         {
             // Instanciar VFX
@@ -175,17 +168,30 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
                 if (targetView != null && targetView.ViewID != photonView.ViewID && (targetHealth != null || enemyHealth != null))
                 {
                     bool targetDefending = (targetCombat != null && targetCombat.isDefending);
-                    int finalDamage = targetDefending ? damage / 4 : damage;
+                    int finalDamage = targetDefending ? damage / 4 : damage; 
 
+                    // ALTERAÇÃO CRÍTICA AQUI: Chamada RPC com parâmetros de Knockback
                     if (targetHealth != null)
                     {
-                        targetView.RPC(nameof(Health.TakeDamage), RpcTarget.All, finalDamage, photonView.ViewID);
+                        // Se o alvo for um jogador, usamos TakeDamageComplete para enviar os valores de Knockback
+                        targetView.RPC(
+                            nameof(Health.TakeDamageComplete), 
+                            RpcTarget.All, 
+                            finalDamage, 
+                            photonView.ViewID, 
+                            pvpKnockbackForce,    // Força de Knockback
+                            pvpKnockbackDuration  // Duração do Knockback
+                        );
                     }
                     else if (enemyHealth != null)
                     {
+                        // Se o alvo for um inimigo, o EnemyHealth deve ter a sua própria lógica de dano/knockback.
+                        // Usamos o RPC simples, assumindo que EnemyHealth tem a versão TakeDamage(int damage, int attackerID)
+                        // ou que ele usa os valores de knockback hardcoded.
                         targetView.RPC(nameof(EnemyHealth.TakeDamage), RpcTarget.All, finalDamage, photonView.ViewID);
                     }
 
+                    // Atualiza a pontuação local
                     PhotonNetwork.LocalPlayer.AddScore(finalDamage);
                     Debug.Log($"{gameObject.name} acertou {enemy.name} com {finalDamage} de dano!");
                 }
@@ -203,6 +209,7 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
             currentKills = (int)PhotonNetwork.LocalPlayer.CustomProperties["Kills"];
         currentKills++;
 
+        // Atualiza a propriedade de kills do jogador
         ExitGames.Client.Photon.Hashtable props = new ExitGames.Client.Photon.Hashtable { { "Kills", currentKills } };
         PhotonNetwork.LocalPlayer.SetCustomProperties(props);
 
@@ -215,6 +222,7 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
         if (vfx != null)
         {
             PhotonView vfxView = vfx.GetComponent<PhotonView>();
+            // Apenas o proprietário do VFX o deve destruir
             if (vfxView != null && vfxView.IsMine)
                 PhotonNetwork.Destroy(vfx);
             else if (vfxView == null)
@@ -225,17 +233,17 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     [PunRPC]
     void SetDefenseState(bool state)
     {
+        // Executado em todos os clientes para sincronizar o estado
         isDefending = state;
 
         if (state)
         {
             if (anim) anim.SetBool("IsDefending", true);
-            Debug.Log($"{gameObject.name} está defendendo!");
+            // Opcional: Adicionar um efeito visual/sonoro de ativação de escudo aqui.
         }
         else
         {
             if (anim) anim.SetBool("IsDefending", false);
-            Debug.Log($"{gameObject.name} parou de defender.");
         }
     }
 
@@ -243,6 +251,7 @@ public class CombatSystem2D : MonoBehaviourPunCallbacks
     {
         if (attackPoint == null) return;
         Gizmos.color = Color.red;
+        // Desenha a área de ataque no editor
         Gizmos.DrawWireSphere(attackPoint.position, attackRange);
     }
 }

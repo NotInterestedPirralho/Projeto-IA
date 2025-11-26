@@ -10,13 +10,20 @@ public class GameChat : MonoBehaviour
     public TextMeshProUGUI chatText;
     public TMP_InputField inputField;
 
+    // NOVO: Acesso estático para outros scripts (movimento/pausa) verificarem se o chat está aberto.
+    public static bool IsChatOpen = false;
+
     // Estado interno
     private bool isInputFieldToggled = false;
     private RoomManager roomManager;
+    // NOVO: Referência ao PMMM (Menu de Pausa)
+    private PMMM pauseManager;
 
     void Start()
     {
+        // 🛑 Assumindo que PMMM é um Singleton e a instância existe 🛑
         roomManager = RoomManager.instance;
+        pauseManager = PMMM.instance; 
         
         // Garante que o input começa escondido
         if (inputField != null)
@@ -24,15 +31,17 @@ public class GameChat : MonoBehaviour
             inputField.gameObject.SetActive(false);
         }
 
-        // Limpa o chat visual ao iniciar
         if (chatText != null) chatText.text = "";
+        IsChatOpen = false; // Resetar o estado estático
     }
 
     void Update()
     {
-        // 1. BLOQUEIOS DE SEGURANÇA (Lobby ou Menu)
-        // Se estiver no menu de nome OU o jogo ainda não começou (Lobby)...
-        if ((roomManager != null && roomManager.IsNamePanelActive) || !LobbyManager.GameStartedAndPlayerCanMove)
+        // 1. BLOQUEIOS DE SEGURANÇA (Lobby, Menu ou PAUSA)
+        // Se estiver no menu de nome OU o jogo ainda não começou OU se o menu de pausa estiver aberto...
+        if ((roomManager != null && roomManager.IsNamePanelActive) || 
+            !LobbyManager.GameStartedAndPlayerCanMove || 
+            (pauseManager != null && PMMM.IsPausedLocally)) 
         {
             if (isInputFieldToggled) ForceCloseChat();
             return;
@@ -51,7 +60,6 @@ public class GameChat : MonoBehaviour
         }
 
         // 4. ENVIAR MENSAGEM (Tecla ENTER)
-        // Verifica se carregou no Enter E se o chat está aberto
         if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) && isInputFieldToggled)
         {
             SendMessageLogic();
@@ -61,38 +69,60 @@ public class GameChat : MonoBehaviour
     // Lógica separada para enviar mensagem para garantir que funciona
     void SendMessageLogic()
     {
-        // Verifica se o texto NÃO é vazio ou só espaços
         if (!string.IsNullOrWhiteSpace(inputField.text))
         {
             string messageToSend = $"<b>{PhotonNetwork.LocalPlayer.NickName}:</b> {inputField.text}";
             
-            // Envia para todos via RPC
-            GetComponent<PhotonView>().RPC("SendChatMessage", RpcTarget.All, messageToSend);
+            // Verifica se o PhotonView existe no objeto do chat (ESSENCIAL)
+            PhotonView pv = GetComponent<PhotonView>();
+            if (pv != null)
+            {
+                // Envia o RPC para todos os clientes
+                pv.RPC("SendChatMessage", RpcTarget.All, messageToSend);
+            }
+            else
+            {
+                Debug.LogError("PhotonView não encontrado no objeto GameChat! A mensagem não será enviada pela rede.");
+            }
         }
 
-        // IMPORTANTE:
-        // Sempre limpa o campo e fecha o chat depois do Enter, mesmo se a msg for vazia.
-        // Isso evita que o cursor fique preso.
+        // Limpa o campo e fecha o chat depois do Enter
         inputField.text = "";
         CloseChat();
     }
 
     void OpenChat()
     {
+        if (pauseManager != null && PMMM.IsPausedLocally) return;
+
         isInputFieldToggled = true;
+        IsChatOpen = true; // Seta o estado estático
         inputField.gameObject.SetActive(true); 
         inputField.Select();
         inputField.ActivateInputField(); // Força o cursor a aparecer
+
+        // Liberta o cursor
+        if (pauseManager != null) 
+        {
+            pauseManager.UnlockCursor(); 
+        }
     }
 
     void CloseChat()
     {
         isInputFieldToggled = false;
+        IsChatOpen = false; // Seta o estado estático
+
+        // Remove o foco e desativa o input
         inputField.DeactivateInputField();
         inputField.gameObject.SetActive(false);
-        
-        // Retira o foco da UI para o jogador poder voltar a controlar o boneco
         EventSystem.current.SetSelectedGameObject(null);
+        
+        // Confina o cursor novamente
+        if (pauseManager != null) 
+        {
+            pauseManager.LockCursor();
+        }
     }
 
     void ForceCloseChat()
@@ -104,6 +134,10 @@ public class GameChat : MonoBehaviour
     [PunRPC]
     public void SendChatMessage(string _message)
     {
+        // Adiciona a nova mensagem e uma quebra de linha
         chatText.text += _message + "\n";
+        
+        // Se precisar de auto-scroll para a última linha, adicione aqui:
+        // chatText.GetComponent<ScrollRect>()?.verticalNormalizedPosition = 0f;
     }
 }

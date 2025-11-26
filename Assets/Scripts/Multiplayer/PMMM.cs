@@ -25,17 +25,19 @@ public class PMMM : MonoBehaviour
             return;
         }
         instance = this;
+        // Permite que o Manager persista entre cenas
         DontDestroyOnLoad(this.gameObject);
 
+        // Define o estado inicial como "não pausado"
         IsPausedLocally = false;
         
+        // Garante que o painel de UI começa desativado
         if (pausePanel != null)
         {
             pausePanel.SetActive(false);
         }
     }
 
-    // Acompanha se estamos numa cena onde a pausa é permitida
     void OnEnable()
     {
         SceneManager.sceneLoaded += OnSceneLoaded;
@@ -48,8 +50,10 @@ public class PMMM : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // Define que a pausa só pode ser ativada nas cenas de jogo
         isGameSceneLoaded = !scene.name.Contains("Menu"); 
 
+        // Se carregarmos uma cena nova, garante que o painel está fechado e o estado redefinido
         if (pausePanel != null)
         {
             pausePanel.SetActive(false);
@@ -59,23 +63,26 @@ public class PMMM : MonoBehaviour
         // Garante que o cursor está no estado correto para o novo ambiente
         if (!isGameSceneLoaded)
         {
-            // Se for menu/lobby, liberta (mantém visível)
+            // Se for menu/lobby, liberta o cursor (visível e livre)
             UnlockCursor();
         }
         else
         {
-            // Se for jogo, confina (mantém visível)
+            // Se for jogo, confina o cursor (visível e confinado, para jogo 2D)
             LockCursor(); 
         }
     }
 
     void Update()
     {
+        // Apenas processa o input de pausa se estivermos numa cena de jogo E numa sala
         if (!isGameSceneLoaded || !PhotonNetwork.InRoom) return;
         
         // Verifica o input da tecla ESCAPE
         if (Input.GetKeyDown(KeyCode.Escape))
         {
+            // O GameChat verifica o ESCAPE primeiro, mas se o chat estiver fechado,
+            // esta lógica é executada para pausar/retomar o jogo.
             if (IsPausedLocally)
             {
                 ResumeGame();
@@ -87,8 +94,13 @@ public class PMMM : MonoBehaviour
         }
     }
 
-    // --- FUNÇÕES DE PAUSA ---
+    // ------------------------------------
+    // --- FUNÇÕES DE PAUSA E RETOMADA ---
+    // ------------------------------------
 
+    /// <summary>
+    /// Pausa o jogo localmente, abrindo o menu e libertando o cursor.
+    /// </summary>
     public void PauseGame()
     {
         if (IsPausedLocally || !isGameSceneLoaded) return;
@@ -107,6 +119,9 @@ public class PMMM : MonoBehaviour
         Debug.Log("Jogo pausado localmente. Inputs bloqueados.");
     }
 
+    /// <summary>
+    /// Retoma o jogo localmente, fechando o menu e confinando o cursor.
+    /// </summary>
     public void ResumeGame()
     {
         if (!IsPausedLocally) return;
@@ -119,18 +134,24 @@ public class PMMM : MonoBehaviour
             pausePanel.SetActive(false);
         }
 
-        // 2. Confina o cursor para o gameplay
+        // 2. Confina o cursor novamente para retomar o gameplay
         LockCursor();
 
         Debug.Log("Jogo retomado. Inputs reativados.");
     }
 
+    // ------------------------------------
     // --- FUNÇÃO DE SAÍDA DO JOGO ---
+    // ------------------------------------
     
+    /// <summary>
+    /// Sai da sala Photon e volta ao menu principal.
+    /// </summary>
     public void LeaveGame()
     {
         if (RoomManager.instance != null)
         {
+            // Assumimos que a cena do menu principal se chama "MenuPrincipal"
             RoomManager.instance.LeaveGameAndGoToMenu("MenuPrincipal");
         }
         else
@@ -138,22 +159,29 @@ public class PMMM : MonoBehaviour
             Debug.LogError("RoomManager não encontrado! Não é possível sair da sala.");
         }
 
+        // Garante que o estado de pausa é redefinido e o cursor libertado
         IsPausedLocally = false;
         UnlockCursor();
     }
     
-    // --- FUNÇÕES DE CONTROLO DO CURSOR MODIFICADAS ---
+    // ------------------------------------
+    // --- FUNÇÕES DE CONTROLO DO CURSOR ---
+    // ------------------------------------
 
-    private void LockCursor()
+    /// <summary>
+    /// Confina o cursor à janela do jogo (Visível e Confined).
+    /// </summary>
+    public void LockCursor()
     {
-        // Confina o cursor à janela (ainda visível) para gameplay
         Cursor.lockState = CursorLockMode.Confined; 
         Cursor.visible = true; // Mantém o cursor visível
     }
 
-    private void UnlockCursor()
+    /// <summary>
+    /// Liberta o cursor para interagir com a UI (Visível e None).
+    /// </summary>
+    public void UnlockCursor()
     {
-        // Liberta o cursor totalmente para a UI de pausa (ainda visível)
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true; // Mantém o cursor visível
     }

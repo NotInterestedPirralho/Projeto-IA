@@ -1,300 +1,200 @@
-//movement
 using UnityEngine;
 using Photon.Pun;
-using System.Collections; // Necessário para as Coroutines
+using System.Collections; // Necessário para Coroutines
 
-[RequireComponent(typeof(Rigidbody2D))]
-public class Movement2D : MonoBehaviour
+// Garante que o jogador tenha um PhotonView
+[RequireComponent(typeof(PhotonView))]
+public class Movement2D : MonoBehaviourPunCallbacks
 {
-    [Header("Movimento")]
-    public float walkSpeed = 5f;
-    public float sprintSpeed = 8f;
-
-    [Header("Pulo")]
+    [Header("Configurações Base")]
+    public float moveSpeed = 5f;
     public float jumpForce = 10f;
-    public int maxJumps = 2;
-
-    [Header("Ground Check")]
     public Transform groundCheck;
-    public float groundCheckRadius = 0.1f;
     public LayerMask groundLayer;
+    public float groundCheckRadius = 0.2f;
 
-    [Header("Wall Check")]
-    private bool isTouchingWall = false; // Flag para saber se está a tocar numa parede lateralmente
-
-    [Header("Knockback")]
-    public bool isKnockedBack = false; // Flag para desativar o controle
-
-    // --- VARIÁVEIS INTERNAS DO POWER UP ---
-    private float defaultWalkSpeed;
-    private float defaultSprintSpeed;
-    private float defaultJumpForce;
-    private Coroutine currentBuffRoutine;
-    // -------------------------------------
-
-    // --- PROPRIEDADES DE LEITURA PARA SINCRONIZAÇÃO (PlayerSetup.cs) ---
-    // Nota: Se estiveres numa versão anterior ao Unity 6, usa rb.velocity em vez de rb.linearVelocity
-    public float CurrentHorizontalSpeed => rb != null ? rb.linearVelocity.x : 0f;
-    public bool IsGrounded => grounded;
-
+    // Componentes
     private Rigidbody2D rb;
-    private bool sprinting;
-    private bool grounded;
-    private int jumpCount;
-
-    private CombatSystem2D combatSystem;
     private Animator anim;
-    private SpriteRenderer spriteRenderer;
-
     private PhotonView pv;
 
-    void Start()
+    private bool isFacingRight = true;
+    
+    // --- Variáveis de Knockback e Buff ---
+    [HideInInspector] public bool isKnockedBack = false; // Estado para bloquear o movimento durante a repulsão
+
+    [Header("Buffs")]
+    private float originalMoveSpeed;
+    private float originalJumpForce;
+    private Coroutine buffCoroutine; // Para gerir o tempo do buff
+
+    // PROPRIEDADES PÚBLICAS PARA SINCRONIZAÇÃO (NOVO E CRÍTICO)
+    // O PlayerSetup usa estas propriedades para enviar o estado pela rede.
+    public float CurrentHorizontalSpeed => rb.linearVelocity.x;
+    public bool IsGrounded => CheckIfGrounded(); 
+    // ***************************************************************
+
+    void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-        combatSystem = GetComponent<CombatSystem2D>();
-        anim = GetComponent<Animator>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
         pv = GetComponent<PhotonView>();
+        rb = GetComponent<Rigidbody2D>();
+        anim = GetComponent<Animator>();
 
-        // --- 1. GUARDAR OS VALORES ORIGINAIS NO INÍCIO ---
-        defaultWalkSpeed = walkSpeed;
-        defaultSprintSpeed = sprintSpeed;
-        defaultJumpForce = jumpForce;
-        // -------------------------------------------------
-
-        if (groundCheck == null)
-            Debug.LogWarning("GroundCheck não atribuído no inspector! Adicione um objeto filho para o check.");
-
-        // Se este NÃO for o jogador local, desativa o script para prevenir inputs.
-        if (pv == null || !pv.IsMine)
-        {
-            enabled = false;
-            return;
-        }
-
-        isKnockedBack = false;
+        // Este script só deve ser ativado para o jogador local.
+        enabled = pv.IsMine;
     }
-
-    // Método público para ser chamado pelo Health.cs
-    public void SetKnockbackState(bool state)
-    {
-        isKnockedBack = state;
-    }
-
-    // --- MÉTODOS DO POWER UP ---
-    public void ActivateSpeedJumpBuff(float duration, float speedMultiplier, float jumpMultiplier)
-    {
-        // Se já existir um buff a correr, paramos para reiniciar/atualizar
-        if (currentBuffRoutine != null)
-        {
-            StopCoroutine(currentBuffRoutine);
-            ResetStats(); // Garante que partimos dos valores base antes de multiplicar de novo
-        }
-
-        currentBuffRoutine = StartCoroutine(BuffRoutine(duration, speedMultiplier, jumpMultiplier));
-    }
-
-    private IEnumerator BuffRoutine(float duration, float speedMult, float jumpMult)
-    {
-        // Aplica os multiplicadores aos valores base
-        walkSpeed = defaultWalkSpeed * speedMult;
-        sprintSpeed = defaultSprintSpeed * speedMult;
-        jumpForce = defaultJumpForce * jumpMult;
-
-        // Opcional: Aqui podias mudar a cor do player para indicar o buff
-        // spriteRenderer.color = Color.yellow; 
-
-        yield return new WaitForSeconds(duration);
-
-        // O tempo acabou, resetar stats
-        ResetStats();
-        currentBuffRoutine = null;
-    }
-
-    private void ResetStats()
-    {
-        walkSpeed = defaultWalkSpeed;
-        sprintSpeed = defaultSprintSpeed;
-        jumpForce = defaultJumpForce;
-
-        // Resetar cor se tivesses mudado
-        // spriteRenderer.color = Color.white;
-    }
-    // ---------------------------
 
     void Update()
     {
-        // VERIFICAR CHÃO SEMPRE (OverlapCircle)
-        if (groundCheck != null)
+        // BLOQUEIO CRUCIAL DE INPUTS
+        // Bloqueia se estiver pausado, no chat, OU A SER REPELIDO (Knocked Back).
+        if (PMMM.IsPausedLocally || GameChat.IsChatOpen || isKnockedBack)
         {
-            grounded = Physics2D.OverlapCircle(
-                groundCheck.position,
-                groundCheckRadius,
-                groundLayer
-            );
+            // Se estiver bloqueado devido a pausa/chat, garante que o movimento para.
+            if (rb != null && !isKnockedBack)
+            {
+                rb.linearVelocity = new Vector2(0, rb.linearVelocity.y); 
+            }
+            
+            if (anim != null)
+            {
+                anim.SetBool("IsRunning", false);
+            }
+            return; // IGNORA O RESTO DOS INPUTS
         }
 
-        // LÓGICA DE PAUSA DO JOGO MULTIPLAYER (NOVA ADIÇÃO)
-        // Se o menu de pausa local estiver aberto, ignoramos TODO o input de movimento.
-        // O Knockback tem prioridade sobre o Menu.
-        if (PMMM.IsPausedLocally)
-        {
-            // Opcional: Garante que a personagem para imediatamente se pausar em movimento.
-            if (rb != null)
-            {
-                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
-            }
+        // --- Lógica de Movimento e Pulo (Apenas para o jogador local) ---
+        HandleHorizontalMovement();
+        HandleJump();
 
-            if (anim)
-            {
-                anim.SetFloat("Speed", 0f);
-                anim.SetBool("Grounded", grounded);
-                anim.SetBool("IsSprinting", false);
-            }
-            return; // IGNORA O RESTO DA LÓGICA DE INPUT E MOVIMENTO
-        }
+        // Lógica de Animação (também apenas local)
+        UpdateAnimations();
+    }
+
+    // ------------------------------------
+    // --- LÓGICA DE MOVIMENTO E SALTO ---
+    // ------------------------------------
+
+    private void HandleHorizontalMovement()
+    {
+        float move = Input.GetAxisRaw("Horizontal");
         
-        // LÓGICA DE KNOCKBACK
-        if (isKnockedBack)
+        // Aplica a velocidade horizontal
+        rb.linearVelocity = new Vector2(move * moveSpeed, rb.linearVelocity.y);
+
+        // Controla o 'Flip' (virar o sprite)
+        if (move < 0 && isFacingRight)
         {
-            if (anim)
-            {
-                anim.SetFloat("Speed", 0f);
-                anim.SetBool("Grounded", grounded);
-            }
-            return; // IGNORA O RESTO DA LÓGICA DE INPUT
+            Flip();
         }
-
-        // Se chegámos aqui, o controlo está ATIVO.
-
-        // LÓGICA DE RESET DE SALTO
-        if (rb != null)
+        else if (move > 0 && !isFacingRight)
         {
-            // Reset principal se estiver no chão
-            if (grounded && Mathf.Abs(rb.linearVelocity.y) <= 0.1f)
-            {
-                jumpCount = 0;
-                isTouchingWall = false; 
-            }
-            // Reset se estiver a tocar na parede e não estiver no chão (para permitir Wall Jump)
-            else if (isTouchingWall && !grounded)
-            {
-                jumpCount = 0; 
-            }
-        }
-
-        float move = 0f;
-        bool isDefending = (combatSystem != null && combatSystem.isDefending);
-
-        // LÓGICA DE MOVIMENTO E SALTO (SÓ se NÃO estiver a defender)
-        if (!isDefending)
-        {
-            // Movimento horizontal
-            move = Input.GetAxisRaw("Horizontal");
-            sprinting = Input.GetKey(KeyCode.LeftShift);
-
-            // Usa a velocidade atual (que pode estar alterada pelo PowerUp)
-            float currentSpeed = sprinting ? sprintSpeed : walkSpeed;
-
-            // Aplica a velocidade de movimento
-            if (Mathf.Abs(move) > 0.05f)
-            {
-                rb.linearVelocity = new Vector2(move * currentSpeed, rb.linearVelocity.y);
-            }
-            else
-            {
-                // Se não houver input e não for wall slide, parar
-                if (!isTouchingWall || grounded)
-                {
-                    rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
-                }
-            }
-
-            // Salto com W (duplo salto)
-            if (Input.GetKeyDown(KeyCode.W) && jumpCount < maxJumps)
-            {
-                // Usa a força de salto atual (que pode estar alterada pelo PowerUp)
-                rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
-                jumpCount++;
-            }
-
-            // Flip do sprite
-            if (spriteRenderer != null)
-            {
-                if (move > 0.05f)
-                    spriteRenderer.flipX = false;
-                else if (move < -0.05f)
-                    spriteRenderer.flipX = true;
-            }
-        }
-        else
-        {
-            // A defender -> Para o movimento horizontal
-            rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
-            move = 0f;
-        }
-
-        // Atualizar Animator
-        if (anim)
-        {
-            anim.SetFloat("Speed", isDefending ? 0f : Mathf.Abs(move));
-            anim.SetBool("Grounded", grounded);
-            bool isSprintAnim = !isDefending && sprinting && Mathf.Abs(move) > 0.05f;
-            anim.SetBool("IsSprinting", isSprintAnim);
+            Flip();
         }
     }
 
+    private void HandleJump()
+    {
+        // Usa a nova propriedade IsGrounded para verificar o estado no chão
+        if (Input.GetButtonDown("Jump") && IsGrounded)
+        {
+            // Aplica a força de salto (limpando a velocidade Y anterior)
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+            if (anim != null)
+            {
+                anim.SetTrigger("Jump");
+            }
+        }
+    }
+
+    private bool CheckIfGrounded()
+    {
+        // Método privado que a propriedade IsGrounded usa
+        return Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
+    }
+
+    private void Flip()
+    {
+        isFacingRight = !isFacingRight;
+        
+        // Inverte a escala X do transform para virar o sprite
+        Vector3 newScale = transform.localScale;
+        newScale.x *= -1;
+        transform.localScale = newScale;
+    }
+
+    private void UpdateAnimations()
+    {
+        if (anim == null) return;
+        
+        bool isRunning = Mathf.Abs(rb.linearVelocity.x) > 0.1f;
+        anim.SetBool("IsRunning", isRunning);
+
+        // Usa a nova propriedade IsGrounded
+        anim.SetBool("IsGrounded", IsGrounded);
+        
+        anim.SetFloat("VerticalSpeed", rb.linearVelocity.y);
+    }
+    
+    // ------------------------------------
+    // --- LÓGICA DE KNOCKBACK ---
+    // ------------------------------------
+
+    /// <summary>
+    /// Define o estado de Knockback. Usado por Health.cs para bloquear inputs
+    /// enquanto a força de repulsão está a ser aplicada.
+    /// </summary>
+    public void SetKnockbackState(bool state) 
+    {
+        isKnockedBack = state;
+        Debug.Log($"Knockback State: {state}");
+    }
+
+
+    // ------------------------------------
+    // --- LÓGICA DE POWER-UP ---
+    // ------------------------------------
+    
+    /// <summary>
+    /// Aplica e gere um buff de Velocidade e Salto no jogador.
+    /// </summary>
+    public void ActivateSpeedJumpBuff(float speedMultiplier, float jumpMultiplier, float duration)
+    {
+        if (!pv.IsMine) return;
+
+        if (buffCoroutine != null)
+        {
+            StopCoroutine(buffCoroutine);
+        }
+        
+        originalMoveSpeed = moveSpeed;
+        originalJumpForce = jumpForce;
+
+        moveSpeed *= speedMultiplier;
+        jumpForce *= jumpMultiplier;
+        
+        buffCoroutine = StartCoroutine(RemoveSpeedJumpBuffAfterTime(duration));
+        
+        Debug.Log($"Buff ativado! Vel. Atual: {moveSpeed}, Salto Atual: {jumpForce}");
+    }
+
+    private IEnumerator RemoveSpeedJumpBuffAfterTime(float duration)
+    {
+        yield return new WaitForSeconds(duration);
+
+        moveSpeed = originalMoveSpeed;
+        jumpForce = originalJumpForce;
+        buffCoroutine = null;
+
+        Debug.Log("Buff terminado. Valores originais restaurados.");
+    }
+    
     void OnDrawGizmosSelected()
     {
         if (groundCheck != null)
         {
-            Gizmos.color = grounded ? Color.green : Color.red;
+            Gizmos.color = Color.yellow;
             Gizmos.DrawWireSphere(groundCheck.position, groundCheckRadius);
-        }
-    }
-
-    // --- Lógica de Colisão ---
-
-    private void OnCollisionEnter2D(Collision2D collision)
-    {
-        if (((1 << collision.gameObject.layer) & groundLayer) != 0)
-        {
-            ContactPoint2D contact = collision.GetContact(0);
-
-            // A. Colisão por baixo (Chão)
-            if (contact.normal.y > 0.5f)
-            {
-                grounded = true;
-                jumpCount = 0;
-                isTouchingWall = false;
-            }
-            // B. Colisão Lateral (Parede)
-            else if (Mathf.Abs(contact.normal.x) > 0.5f && !grounded)
-            {
-                isTouchingWall = true;
-            }
-        }
-    }
-
-    private void OnCollisionStay2D(Collision2D collision)
-    {
-        if (((1 << collision.gameObject.layer) & groundLayer) != 0)
-        {
-            ContactPoint2D contact = collision.GetContact(0);
-
-            // Só ativa se for lateral e não for chão
-            if (Mathf.Abs(contact.normal.x) > 0.5f && contact.normal.y < 0.5f)
-            {
-                isTouchingWall = true;
-            }
-        }
-    }
-
-    private void OnCollisionExit2D(Collision2D collision)
-    {
-        if (((1 << collision.gameObject.layer) & groundLayer) != 0)
-        {
-            isTouchingWall = false;
         }
     }
 }

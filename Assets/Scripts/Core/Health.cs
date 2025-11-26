@@ -70,6 +70,15 @@ public class Health : MonoBehaviourPunCallbacks
     {
         if (isDead) return;
 
+        // Verifica se o alvo tem um escudo ativo
+        CombatSystem2D combatSystem = GetComponent<CombatSystem2D>();
+        if (combatSystem != null && combatSystem.isDefending)
+        {
+            // O dano já foi reduzido no CombatSystem2D, mas podemos adicionar
+            // uma verificação de "bloqueio" aqui se necessário (opcional).
+            // Apenas para efeitos visuais/sonoros, se não estiver a usar o CombatSystem.
+        }
+
         health = Mathf.Max(health - _damage, 0);
 
         UpdateHealthUI();
@@ -120,15 +129,29 @@ public class Health : MonoBehaviourPunCallbacks
     private IEnumerator KnockbackRoutine(Vector2 direction, float force, float duration)
     {
         isKnockedBack = true;
+        
+        // Ativa o estado de bloqueio de movimento no Movement2D
         if (playerMovement != null) playerMovement.SetKnockbackState(true);
 
-        rb.linearVelocity = Vector2.zero;
+        // CORREÇÃO: Limpa a velocidade antes de aplicar a força
+        // Garante que o knockback é imediato e não luta contra o movimento anterior.
+        rb.linearVelocity = Vector2.zero; 
+        
+        // Aplica a força de repulsão
         rb.AddForce(direction * force, ForceMode2D.Impulse);
 
         yield return new WaitForSeconds(duration);
 
+        // CORREÇÃO: Garante que o knockback termina
         if (playerMovement != null) playerMovement.SetKnockbackState(false);
         isKnockedBack = false;
+        
+        // MELHORIA: Zera a velocidade horizontal para garantir que para após o knockback
+        // (O jogador continuaria a cair, mas o impulso lateral desaparece)
+        if (rb != null)
+        {
+             rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+        }
     }
 
     // ---------------------------------------------------------------------------------
