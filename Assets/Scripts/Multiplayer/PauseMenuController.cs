@@ -1,5 +1,5 @@
 using UnityEngine;
-using Photon.Pun; // Necessário para ter acesso ao RoomManager/TGRoomManager se forem scripts Pun
+using Photon.Pun; // Necessï¿½rio para ter acesso ao RoomManager/TGRoomManager se forem scripts Pun
 
 public class PauseMenuController : MonoBehaviour
 {
@@ -11,7 +11,7 @@ public class PauseMenuController : MonoBehaviour
     // Deve ser chamada sempre que o utilizador prime a tecla de Pausa (ex: Escape)
     void Update()
     {
-        // Se a Unity não tiver foco, não queremos registar o input
+        // Se a Unity nï¿½o tiver foco, nï¿½o queremos registar o input
         if (!Application.isFocused) return;
 
         if (Input.GetKeyDown(KeyCode.Escape))
@@ -40,7 +40,7 @@ public class PauseMenuController : MonoBehaviour
     /// </summary>
     public void PauseGame()
     {
-        // 1. VERIFICAÇÃO DE PRÉ-PAUSA: Se estivermos numa fase de conexão/configuração, bloqueia a pausa.
+        // 1. VERIFICAï¿½ï¿½O DE PRï¿½-PAUSA: Se estivermos numa fase de conexï¿½o/configuraï¿½ï¿½o, bloqueia a pausa.
 
         // Se estivermos no modo normal/multiplayer, verifica o painel de nome
         if (RoomManager.instance != null)
@@ -48,16 +48,16 @@ public class PauseMenuController : MonoBehaviour
             // Se o painel de nome ainda estiver ativo, estamos a configurar. Bloqueia a pausa.
             if (RoomManager.instance.IsNamePanelActive)
             {
-                Debug.LogWarning("Não é possível pausar: O painel de nome/conexão ainda está ativo.");
+                Debug.LogWarning("Nï¿½o ï¿½ possï¿½vel pausar: O painel de nome/conexï¿½o ainda estï¿½ ativo.");
                 return;
             }
         }
-        // Se estivermos no modo de treino e ainda a conectar, também poderíamos bloquear.
-        // No TGRoomManager, ele conecta e junta-se à sala imediatamente, portanto,
-        // não é estritamente necessário bloquear, mas mantemos a estrutura de verificação
+        // Se estivermos no modo de treino e ainda a conectar, tambï¿½m poderï¿½amos bloquear.
+        // No TGRoomManager, ele conecta e junta-se ï¿½ sala imediatamente, portanto,
+        // nï¿½o ï¿½ estritamente necessï¿½rio bloquear, mas mantemos a estrutura de verificaï¿½ï¿½o
         else if (TGRoomManager.instance != null)
         {
-            // Adicionar aqui qualquer verificação de UI específica do modo de treino, se existir.
+            // Adicionar aqui qualquer verificaï¿½ï¿½o de UI especï¿½fica do modo de treino, se existir.
         }
 
 
