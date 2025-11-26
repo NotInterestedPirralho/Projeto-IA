@@ -1,6 +1,6 @@
 using UnityEngine;
 using Photon.Pun;
-using System.Collections; // Necessário para Coroutines
+using System.Collections; 
 
 // Garante que o jogador tenha um PhotonView
 [RequireComponent(typeof(PhotonView))]
@@ -9,6 +9,14 @@ public class Movement2D : MonoBehaviourPunCallbacks
     [Header("Configurações Base")]
     public float moveSpeed = 5f;
     public float jumpForce = 10f;
+    
+    // --- Variáveis de Double Jump ---
+    [Header("Salto")]
+    [Tooltip("Número máximo de saltos permitidos (2 para Double Jump, 3 para Triple Jump, etc.).")]
+    public int maxJumps = 2; 
+    private int jumpsRemaining; // Contador de saltos disponíveis
+    
+    // --- Variáveis de Verificação de Chão ---
     public Transform groundCheck;
     public LayerMask groundLayer;
     public float groundCheckRadius = 0.2f;
@@ -21,36 +29,33 @@ public class Movement2D : MonoBehaviourPunCallbacks
     private bool isFacingRight = true;
     
     // --- Variáveis de Knockback e Buff ---
-    [HideInInspector] public bool isKnockedBack = false; // Estado para bloquear o movimento durante a repulsão
+    [HideInInspector] public bool isKnockedBack = false; 
 
     [Header("Buffs")]
     private float originalMoveSpeed;
     private float originalJumpForce;
-    private Coroutine buffCoroutine; // Para gerir o tempo do buff
+    private Coroutine buffCoroutine; 
 
-    // PROPRIEDADES PÚBLICAS PARA SINCRONIZAÇÃO (NOVO E CRÍTICO)
-    // O PlayerSetup usa estas propriedades para enviar o estado pela rede.
+    // PROPRIEDADES PÚBLICAS PARA SINCRONIZAÇÃO
     public float CurrentHorizontalSpeed => rb.linearVelocity.x;
     public bool IsGrounded => CheckIfGrounded(); 
-    // ***************************************************************
 
     void Awake()
     {
         pv = GetComponent<PhotonView>();
         rb = GetComponent<Rigidbody2D>();
         anim = GetComponent<Animator>();
+        
+        jumpsRemaining = maxJumps;
 
-        // Este script só deve ser ativado para o jogador local.
         enabled = pv.IsMine;
     }
 
     void Update()
     {
         // BLOQUEIO CRUCIAL DE INPUTS
-        // Bloqueia se estiver pausado, no chat, OU A SER REPELIDO (Knocked Back).
         if (PMMM.IsPausedLocally || GameChat.IsChatOpen || isKnockedBack)
         {
-            // Se estiver bloqueado devido a pausa/chat, garante que o movimento para.
             if (rb != null && !isKnockedBack)
             {
                 rb.linearVelocity = new Vector2(0, rb.linearVelocity.y); 
@@ -60,21 +65,17 @@ public class Movement2D : MonoBehaviourPunCallbacks
             {
                 anim.SetBool("IsRunning", false);
             }
-            return; // IGNORA O RESTO DOS INPUTS
+            return; 
         }
 
         // --- Lógica de Movimento e Pulo (Apenas para o jogador local) ---
         HandleHorizontalMovement();
-        HandleJump();
+        HandleJump(); // Contém a nova lógica para W e Jump
 
         // Lógica de Animação (também apenas local)
         UpdateAnimations();
     }
-
-    // ------------------------------------
-    // --- LÓGICA DE MOVIMENTO E SALTO ---
-    // ------------------------------------
-
+    
     private void HandleHorizontalMovement()
     {
         float move = Input.GetAxisRaw("Horizontal");
@@ -93,13 +94,27 @@ public class Movement2D : MonoBehaviourPunCallbacks
         }
     }
 
+    // LÓGICA DE SALTO COM TECLA W E JUMP (ESPAÇO)
     private void HandleJump()
     {
-        // Usa a nova propriedade IsGrounded para verificar o estado no chão
-        if (Input.GetButtonDown("Jump") && IsGrounded)
+        // 1. Resetar o contador de saltos se estiver no chão.
+        if (IsGrounded)
         {
-            // Aplica a força de salto (limpando a velocidade Y anterior)
+            jumpsRemaining = maxJumps;
+        }
+
+        // Verifica se o Input de Salto ocorreu (Barra de Espaço OU Tecla W)
+        bool jumpInput = Input.GetButtonDown("Jump") || Input.GetKeyDown(KeyCode.W);
+
+        // 2. Se o Input for pressionado e o jogador tiver saltos disponíveis.
+        if (jumpInput && jumpsRemaining > 0)
+        {
+            // Decrementa o contador de saltos disponíveis.
+            jumpsRemaining--;
+
+            // Aplica a força de salto
             rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+
             if (anim != null)
             {
                 anim.SetTrigger("Jump");
@@ -109,7 +124,6 @@ public class Movement2D : MonoBehaviourPunCallbacks
 
     private bool CheckIfGrounded()
     {
-        // Método privado que a propriedade IsGrounded usa
         return Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
     }
 
@@ -117,7 +131,6 @@ public class Movement2D : MonoBehaviourPunCallbacks
     {
         isFacingRight = !isFacingRight;
         
-        // Inverte a escala X do transform para virar o sprite
         Vector3 newScale = transform.localScale;
         newScale.x *= -1;
         transform.localScale = newScale;
@@ -130,34 +143,21 @@ public class Movement2D : MonoBehaviourPunCallbacks
         bool isRunning = Mathf.Abs(rb.linearVelocity.x) > 0.1f;
         anim.SetBool("IsRunning", isRunning);
 
-        // Usa a nova propriedade IsGrounded
         anim.SetBool("IsGrounded", IsGrounded);
         
         anim.SetFloat("VerticalSpeed", rb.linearVelocity.y);
     }
     
     // ------------------------------------
-    // --- LÓGICA DE KNOCKBACK ---
+    // --- LÓGICA DE KNOCKBACK E POWER-UP (Inalterada) ---
     // ------------------------------------
 
-    /// <summary>
-    /// Define o estado de Knockback. Usado por Health.cs para bloquear inputs
-    /// enquanto a força de repulsão está a ser aplicada.
-    /// </summary>
     public void SetKnockbackState(bool state) 
     {
         isKnockedBack = state;
         Debug.Log($"Knockback State: {state}");
     }
-
-
-    // ------------------------------------
-    // --- LÓGICA DE POWER-UP ---
-    // ------------------------------------
     
-    /// <summary>
-    /// Aplica e gere um buff de Velocidade e Salto no jogador.
-    /// </summary>
     public void ActivateSpeedJumpBuff(float speedMultiplier, float jumpMultiplier, float duration)
     {
         if (!pv.IsMine) return;
