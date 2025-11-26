@@ -1,6 +1,7 @@
 using UnityEngine;
 using Photon.Pun;
 using System.Collections; 
+using System.Linq; // Necessário para aceder a Collision2D.contacts
 
 // Garante que o jogador tenha um PhotonView
 [RequireComponent(typeof(PhotonView))]
@@ -9,12 +10,17 @@ public class Movement2D : MonoBehaviourPunCallbacks
     [Header("Configurações Base")]
     public float moveSpeed = 5f;
     public float jumpForce = 10f;
-    
+
+    // --- Variáveis de Corrida ---
+    [Header("Corrida")]
+    public float sprintMultiplier = 1.8f; 
+    private float currentMoveSpeed; 
+
     // --- Variáveis de Double Jump ---
     [Header("Salto")]
-    [Tooltip("Número máximo de saltos permitidos (2 para Double Jump, 3 para Triple Jump, etc.).")]
+    [Tooltip("Número máximo de saltos permitidos.")]
     public int maxJumps = 2; 
-    private int jumpsRemaining; // Contador de saltos disponíveis
+    private int jumpsRemaining; 
     
     // --- Variáveis de Verificação de Chão ---
     public Transform groundCheck;
@@ -38,6 +44,7 @@ public class Movement2D : MonoBehaviourPunCallbacks
 
     // PROPRIEDADES PÚBLICAS PARA SINCRONIZAÇÃO
     public float CurrentHorizontalSpeed => rb.linearVelocity.x;
+    // IsGrounded é mantido para animações/estados, usando OverlapCircle
     public bool IsGrounded => CheckIfGrounded(); 
 
     void Awake()
@@ -47,6 +54,7 @@ public class Movement2D : MonoBehaviourPunCallbacks
         anim = GetComponent<Animator>();
         
         jumpsRemaining = maxJumps;
+        currentMoveSpeed = moveSpeed;
 
         enabled = pv.IsMine;
     }
@@ -70,18 +78,31 @@ public class Movement2D : MonoBehaviourPunCallbacks
 
         // --- Lógica de Movimento e Pulo (Apenas para o jogador local) ---
         HandleHorizontalMovement();
-        HandleJump(); // Contém a nova lógica para W e Jump
+        HandleJump();
 
         // Lógica de Animação (também apenas local)
         UpdateAnimations();
     }
     
+    // ------------------------------------
+    // --- LÓGICA DE MOVIMENTO E SALTO ---
+    // ------------------------------------
+
     private void HandleHorizontalMovement()
     {
+        // Lógica de Corrida
+        if (Input.GetKey(KeyCode.LeftShift))
+        {
+            currentMoveSpeed = moveSpeed * sprintMultiplier;
+        }
+        else
+        {
+            currentMoveSpeed = moveSpeed;
+        }
+        
         float move = Input.GetAxisRaw("Horizontal");
         
-        // Aplica a velocidade horizontal
-        rb.linearVelocity = new Vector2(move * moveSpeed, rb.linearVelocity.y);
+        rb.linearVelocity = new Vector2(move * currentMoveSpeed, rb.linearVelocity.y);
 
         // Controla o 'Flip' (virar o sprite)
         if (move < 0 && isFacingRight)
@@ -94,22 +115,14 @@ public class Movement2D : MonoBehaviourPunCallbacks
         }
     }
 
-    // LÓGICA DE SALTO COM TECLA W E JUMP (ESPAÇO)
     private void HandleJump()
     {
-        // 1. Resetar o contador de saltos se estiver no chão.
-        if (IsGrounded)
-        {
-            jumpsRemaining = maxJumps;
-        }
-
         // Verifica se o Input de Salto ocorreu (Barra de Espaço OU Tecla W)
         bool jumpInput = Input.GetButtonDown("Jump") || Input.GetKeyDown(KeyCode.W);
 
-        // 2. Se o Input for pressionado e o jogador tiver saltos disponíveis.
+        // AQUI NÃO HÁ RESET DE JUMPS, É SÓ A LÓGICA DE SALTO
         if (jumpInput && jumpsRemaining > 0)
         {
-            // Decrementa o contador de saltos disponíveis.
             jumpsRemaining--;
 
             // Aplica a força de salto
@@ -124,8 +137,26 @@ public class Movement2D : MonoBehaviourPunCallbacks
 
     private bool CheckIfGrounded()
     {
+        // Este método é usado apenas para a animação "IsGrounded"
         return Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
     }
+    
+    // NOVO: LÓGICA PARA REATIVAR O SALTO APENAS AO TOCAR NO CHÃO
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        // Verifica se o objeto com que colidiu está na groundLayer
+        if (((1 << collision.gameObject.layer) & groundLayer) != 0)
+        {
+            // O 0.9f garante que o contacto é quase puramente vertical (chão)
+            // Paredes teriam um valor de Y próximo de 0.
+            if (collision.contacts.Any(contact => contact.normal.y > 0.9f))
+            {
+                // Reset de saltos só se for confirmado que é o chão
+                jumpsRemaining = maxJumps;
+            }
+        }
+    }
+    // ------------------------------------------------------------------
 
     private void Flip()
     {
@@ -143,6 +174,7 @@ public class Movement2D : MonoBehaviourPunCallbacks
         bool isRunning = Mathf.Abs(rb.linearVelocity.x) > 0.1f;
         anim.SetBool("IsRunning", isRunning);
 
+        // Usa o IsGrounded antigo (baseado no círculo)
         anim.SetBool("IsGrounded", IsGrounded);
         
         anim.SetFloat("VerticalSpeed", rb.linearVelocity.y);
@@ -170,7 +202,7 @@ public class Movement2D : MonoBehaviourPunCallbacks
         originalMoveSpeed = moveSpeed;
         originalJumpForce = jumpForce;
 
-        moveSpeed *= speedMultiplier;
+        moveSpeed *= speedMultiplier; 
         jumpForce *= jumpMultiplier;
         
         buffCoroutine = StartCoroutine(RemoveSpeedJumpBuffAfterTime(duration));
