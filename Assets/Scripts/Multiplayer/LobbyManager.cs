@@ -318,7 +318,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             lobbyPanel.SetActive(false);
         }
 
-        // 3. Desativa a câmera do Lobby (Correção: uso do .)
+        // 3. Desativa a câmera do Lobby 
         if (RoomManager.instance != null && RoomManager.instance.roomCam != null)
         {
             RoomManager.instance.roomCam.SetActive(false);
