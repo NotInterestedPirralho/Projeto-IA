@@ -1548,6 +1548,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dbe35ac3aba83114195a7bdae8af87c1, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  player: {fileID: 0}
   spawnPoints:
   - {fileID: 893687746}
   - {fileID: 428578119}
@@ -1556,6 +1557,7 @@ MonoBehaviour:
   roomCam: {fileID: 1386885288}
   nameUI: {fileID: 340567478}
   connectigUI: {fileID: 316747551}
+  endScreen: {fileID: 0}
   mapName: Arena 1
 --- !u!4 &571687582
 Transform:
@@ -5093,7 +5095,7 @@ MonoBehaviour:
   countdownText: {fileID: 1282447432}
   playerListText: {fileID: 1381320678}
   startGameButton: {fileID: 1914707497}
-  gameChatPrefab: {fileID: 0}
+  gameChatPrefab: {fileID: 6899345376298166558}
 --- !u!4 &1519927154
 Transform:
   m_ObjectHideFlags: 0
@@ -7301,6 +7303,11 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a98a376fd915cbc49b4c8df582787856, type: 3}
+--- !u!1 &6899345376298166558 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 7603272609764651831, guid: a98a376fd915cbc49b4c8df582787856, type: 3}
+  m_PrefabInstance: {fileID: 6899345376298166557}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
