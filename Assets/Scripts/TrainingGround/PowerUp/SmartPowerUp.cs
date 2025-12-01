@@ -9,7 +9,7 @@ public class SmartPowerUp : MonoBehaviour
         DamageBoost
     }
 
-    [Header("Decis�o")]
+    [Header("Decisao")]
     [Range(0f, 1f)]
     public float lowHealthThreshold = 0.3f;   // 30% de vida para decidir cura
 
@@ -113,7 +113,7 @@ public class SmartPowerUp : MonoBehaviour
         }
         else
         {
-            Debug.Log("SMART POWER-UP: Vida j� estava cheia.");
+            Debug.Log("SMART POWER-UP: Vida ja estava cheia.");
         }
     }
 
