@@ -6,7 +6,7 @@ using UnityEngine.UI;
 using Hashtable = ExitGames.Client.Photon.Hashtable;
 using TMPro;
 
-// --- PROPRIEDADES DE SALA SINCRONIZADAS ---
+// --- PROPRIEDADES DE SALA SINCRONIZADAS (CHAVES) ---
 public static class CustomRoomProperties
 {
     // Chave para a hora de início da contagem regressiva (double - PhotonNetwork.Time)
@@ -137,6 +137,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     public override void OnPlayerLeftRoom(Player otherPlayer)
     {
         base.OnPlayerLeftRoom(otherPlayer);
+        // O Master Client reavalia as condições de início
         if (PhotonNetwork.IsMasterClient)
         {
             CheckStartConditions();
@@ -318,18 +319,25 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
 
         // 3. Desativa a câmera do Lobby
+        // Lembre-se: RoomManager.instance.roomCam deve usar '.' em vez de '->'
         if (RoomManager.instance != null && RoomManager.instance.roomCam != null)
         {
             RoomManager.instance.roomCam.SetActive(false);
         }
         
-        // 4. INSTANCIA O CHAT
+        // 4. INSTANCIA O CHAT E OBTEM A REFERÊNCIA
         if (gameChatPrefab != null)
         {
-            // O chat é criado AGORA, depois de GameStartedAndPlayerCanMove ser TRUE.
-            // O chat é um objeto UI LOCAL (não de rede, pois é uma tela/HUD)
-            Instantiate(gameChatPrefab); 
-            Debug.Log("[Lobby] GameChat UI Instanciado.");
+            GameObject chatGO = Instantiate(gameChatPrefab); 
+            GameChat chatInstance = chatGO.GetComponent<GameChat>();
+            
+            // Chama o método de ativação, que torna a UI visível
+            if (chatInstance != null)
+            {
+                chatInstance.ActivateChatUI();
+            }
+            
+            Debug.Log("[Lobby] GameChat UI Instanciado e Ativado.");
         }
 
         // 5. Permite que o RoomManager spawne o jogador local.
