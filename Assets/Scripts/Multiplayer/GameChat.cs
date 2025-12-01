@@ -1,17 +1,17 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using WebSocketSharp; // Nota: Esta referência pode não ser necessária a menos que a use noutros locais.
 using Photon.Pun;
 using System.Collections;
+using System.Linq; // Necessário para algumas extensões, embora não estritamente usado aqui.
 
 public class GameChat : MonoBehaviour
 {
-    // NOVO: IMPLEMENTAÇÃO SINGLETON
-    // A instância estática permite que outros scripts (CombatSystem, Movement) acedam a ele facilmente.
+    // --- Singleton Pattern ---
+    // Instância estática para acesso global (ex: Movement2D.cs, CombatSystem2D.cs)
     public static GameChat instance;
 
-    // NOVO: PROPRIEDADE PÚBLICA DE ACESSO
+    // --- Propriedade de Acesso ---
     // Informa outros scripts se o jogador está a escrever no chat.
     public bool IsChatOpen => isInputFiieldToggled;
 
@@ -19,7 +19,7 @@ public class GameChat : MonoBehaviour
     public TextMeshProUGUI chatText;
     public TMP_InputField InputField;
 
-    private bool isInputFiieldToggled;
+    private bool isInputFiieldToggled = false;
 
     // Implementação do Singleton em Awake
     void Awake()
@@ -27,26 +27,57 @@ public class GameChat : MonoBehaviour
         if (instance == null)
         {
             instance = this;
-            // Se o teu GameChat for um prefab persistente, considera DontDestroyOnLoad(gameObject);
         }
         else if (instance != this)
         {
-            Destroy(gameObject); // Garante que só há uma instância
+            Destroy(gameObject); 
+        }
+
+        // Garante que o input field está desativado no início
+        if (InputField != null)
+        {
+            InputField.DeactivateInputField();
         }
     }
 
     void Update()
     {
         // ----------------------------------------------------
+        // BLOQUEIO 1: NO LOBBY (Prioridade Máxima)
+        // O chat só pode ser usado depois de o jogo começar.
+        // É opcional (verifica se o LobbyManager.instance existe).
+        // ----------------------------------------------------
+        bool lobbyBlocking = (LobbyManager.instance != null && !LobbyManager.GameStartedAndPlayerCanMove);
+
+        if (lobbyBlocking)
+        {
+            if (isInputFiieldToggled) CloseChatInput();
+            return; 
+        }
+
+        // ----------------------------------------------------
+        // BLOQUEIO 2: NO PAUSE MENU (Prioridade Média)
+        // É opcional (verifica se o PMMM.instance existe).
+        // ----------------------------------------------------
+        bool isPaused = (PMMM.instance != null && PMMM.IsPausedLocally);
+
+        if (isPaused)
+        {
+            // Se o jogo for pausado enquanto o chat estava aberto, garante que ele fecha.
+            if (isInputFiieldToggled)
+            {
+                CloseChatInput();
+            }
+            return; // Bloqueia todo o input de chat enquanto o jogo estiver pausado.
+        }
+
+
+        // ----------------------------------------------------
         // LÓGICA DE ATIVAÇÃO DO CHAT (Tecla 'Y')
         // ----------------------------------------------------
         if (Input.GetKeyDown(KeyCode.Y) && !isInputFiieldToggled)
         {
-            isInputFiieldToggled = true;
-            InputField.Select();
-            InputField.ActivateInputField();
-
-            Debug.Log("InputField ativado");
+            OpenChatInput();
         }
 
         // ----------------------------------------------------
@@ -54,38 +85,60 @@ public class GameChat : MonoBehaviour
         // ----------------------------------------------------
         if(Input.GetKeyDown(KeyCode.Escape) && isInputFiieldToggled)
         {
-            isInputFiieldToggled = false;
-
-            // Desseleciona o InputField para remover o foco
-            UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
-
-            Debug.Log("InputField desativado");
+            CloseChatInput();
         }
 
         // ----------------------------------------------------
         // LÓGICA DE ENVIO DE MENSAGEM (Tecla 'Enter')
         // ----------------------------------------------------
-        // Verifica Enter ou KeypadEnter, se o chat estiver ativo E se houver texto
-        if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) && isInputFiieldToggled && !InputField.text.IsNullOrEmpty())
+        if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) && isInputFiieldToggled && !string.IsNullOrEmpty(InputField.text))
         {
-            if (isInputFiieldToggled)
-            {
-                // Formata a mensagem com o nome do jogador
-                string messagetoSend = $"{PhotonNetwork.LocalPlayer.NickName}: {InputField.text}";
-
-                // Envia a mensagem a todos os clientes via RPC
-                GetComponent<PhotonView>().RPC("SendChatMessage", RpcTarget.All, messagetoSend);
-
-                // Limpa o input e desativa o chat
-                InputField.text = "";
-                isInputFiieldToggled = false; 
-
-                // Desseleciona o InputField
-                UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
-
-                Debug.Log("Mensagem enviada");
-            }
+            SendCurrentMessage();
         }
+    }
+
+    private void OpenChatInput()
+    {
+        isInputFiieldToggled = true;
+        InputField.Select();
+        InputField.ActivateInputField();
+
+        Debug.Log("InputField ativado");
+    }
+
+    private void CloseChatInput()
+    {
+        isInputFiieldToggled = false;
+        InputField.DeactivateInputField();
+        
+        // Remove o foco do InputField para que o input do jogador volte ao jogo
+        UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
+        
+        Debug.Log("InputField desativado");
+    }
+    
+    private void SendCurrentMessage()
+    {
+        // Verifica se estamos conectados para obter o NickName
+        string senderName = PhotonNetwork.IsConnected ? PhotonNetwork.LocalPlayer.NickName : "LocalPlayer";
+        string messagetoSend = $"{senderName}: {InputField.text}";
+
+        // Envia a mensagem a todos os clientes via RPC (ou apenas chama o SendChatMessage localmente se não estiver na rede)
+        PhotonView pv = GetComponent<PhotonView>();
+        
+        if (pv != null && PhotonNetwork.InRoom)
+        {
+            pv.RPC("SendChatMessage", RpcTarget.All, messagetoSend);
+        }
+        else
+        {
+            // Chamada local se não estivermos em rede ou em sala
+            SendChatMessage(messagetoSend); 
+        }
+
+        // Limpa o input e fecha
+        InputField.text = "";
+        CloseChatInput();
     }
 
     // Método RPC chamado para distribuir a mensagem por todos os clientes
