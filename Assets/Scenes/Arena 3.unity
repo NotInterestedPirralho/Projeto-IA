@@ -4494,7 +4494,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1093074736}
   - component: {fileID: 1093074735}
-  - component: {fileID: 1093074734}
+  - component: {fileID: 1093074737}
   m_Layer: 0
   m_Name: PowerupManager
   m_TagString: Untagged
@@ -4502,29 +4502,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1093074734
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1093074733}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 64ea9524f99c84d47a42543764632dea, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  powerupPrefabs:
-  - {fileID: 5102893418727819705, guid: ac285f92a1d0a9c4a9f6d839195f60b5, type: 3}
-  - {fileID: 8816147604158316405, guid: f842698cb5a2fad438547c47ee58868a, type: 3}
-  arenaBounds: {fileID: 1093074735}
-  groundMask:
-    serializedVersion: 2
-    m_Bits: 8
-  tempoNoMapa: 15
-  tempoEntreSpawns: 20
-  offsetY: 0.5
-  maxTentativas: 20
 --- !u!61 &1093074735
 BoxCollider2D:
   m_ObjectHideFlags: 0
@@ -4586,6 +4563,28 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1093074737
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1093074733}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9005cac01af909447bf0c189072a805e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  powerupPrefabNames:
+  - SpeedBoots_MP
+  - HealthPotion_MP
+  arenaBounds: {fileID: 1093074735}
+  groundMask:
+    serializedVersion: 2
+    m_Bits: 8
+  spawnInterval: 15
+  verticalOffset: 0.5
+  maxAttempts: 10
 --- !u!1 &1114807464
 GameObject:
   m_ObjectHideFlags: 0

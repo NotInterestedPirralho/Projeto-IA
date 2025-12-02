@@ -42,6 +42,7 @@ public class NetworkedPowerup : MonoBehaviourPun
                 // Se eu sou o DONO DA SALA (Master Client), tenho permissão para destruir.
                 if (PhotonNetwork.IsMasterClient)
                 {
+
                     PhotonNetwork.Destroy(gameObject);
                 }
                 else

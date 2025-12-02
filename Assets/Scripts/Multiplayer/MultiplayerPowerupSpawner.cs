@@ -43,6 +43,8 @@ public class MultiplayerPowerupSpawner : MonoBehaviour
 
         Bounds bounds = arenaBounds.bounds;
 
+        Debug.Log($"1---~ {bounds}");
+
         // Tenta encontrar um lugar válido X vezes
         for (int i = 0; i < maxAttempts; i++)
         {
