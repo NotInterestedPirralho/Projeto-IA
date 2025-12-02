@@ -28,33 +28,33 @@ public class Movement2D : MonoBehaviourPunCallbacks
     // VARIÁVEIS PARA O STOMP (ID 14)
     // ===========================================
     [Header("Stomp")]
-    public float stompForce = 7f;           // Força de salto do jogador após o Stomp (Bounce) - AJUSTADO PARA UM VALOR MAIS BAIXO
-    public int stompDamage = 15;            // Dano que o Stomp causa ao inimigo
-    public string enemyTag = "Enemy";       // A Tag que os seus inimigos usam
-    public float minStompNormalY = 0.7f;    // Mínimo Y da normal para contar como Stomp
-                                            // ===========================================
+    public float stompForce = 7f; 
+    public int stompDamage = 15; 
+    public string enemyTag = "Enemy"; 
+    public float minStompNormalY = 0.7f; 
+    // ===========================================
 
     // ===========================================
     // VARIÁVEIS PARA O ÍCONE DE SPEED (ID 17)
     // ===========================================
     [Header("UI References")]
-    [SerializeField] private Animator speedIconAnimator; // Para ligar/desligar a animação do ícone
+    [SerializeField] private Animator speedIconAnimator; 
     // ===========================================
 
 
-    // --- VARIÁVEIS INTERNAS DO POWER UP ---
-    private float defaultWalkSpeed;
+    // --- VARIÁVEIS INTERNAS DO POWER UP ---
+    private float defaultWalkSpeed;
     private float defaultSprintSpeed;
     private float defaultJumpForce;
-    private Coroutine currentBuffRoutine; // Para gerir o tempo do buff
-    // -------------------------------------
+    private Coroutine currentBuffRoutine; 
+    // -------------------------------------
 
-    // Propriedades de Acesso
-    public float CurrentHorizontalSpeed => rb != null ? rb.linearVelocity.x : 0f;
+    // Propriedades de Acesso
+    public float CurrentHorizontalSpeed => rb != null ? rb.linearVelocity.x : 0f;
     public bool IsGrounded => grounded;
 
-    // --- Referências de Componentes e Singletons ---
-    private Rigidbody2D rb;
+    // --- Referências de Componentes e Singletons ---
+    private Rigidbody2D rb;
     private bool sprinting;
     private bool grounded;
     private int jumpCount;
@@ -75,10 +75,10 @@ public class Movement2D : MonoBehaviourPunCallbacks
         spriteRenderer = GetComponent<SpriteRenderer>();
         pv = GetComponent<PhotonView>();
 
-        // Tenta obter a instância do Chat, se existir.
-        // chatInstance = GameChat.instance; 
+        // Tenta obter a instância do Chat, se existir. (Agora Ativo)
+        chatInstance = GameChat.instance; 
 
-        // 1. GUARDAR OS VALORES ORIGINAIS NO INÍCIO (Valores base para o Reset)
+        // 1. GUARDAR OS VALORES ORIGINAIS NO INÍCIO
         defaultWalkSpeed = walkSpeed;
         defaultSprintSpeed = sprintSpeed;
         defaultJumpForce = jumpForce;
@@ -86,8 +86,7 @@ public class Movement2D : MonoBehaviourPunCallbacks
         if (groundCheck == null)
             Debug.LogWarning("GroundCheck não atribuído no inspector! Adicione um objeto filho para o check.");
 
-        // Se o Photon View existir E não for o jogador local, desativa.
-        if (pv != null && !pv.IsMine)
+        if (pv != null && !pv.IsMine)
         {
             enabled = false;
             return;
@@ -96,58 +95,44 @@ public class Movement2D : MonoBehaviourPunCallbacks
         isKnockedBack = false;
     }
 
-    // Método público para ser chamado pelo Health.cs
-    public void SetKnockbackState(bool state)
+    // Método público para ser chamado pelo Health.cs
+    public void SetKnockbackState(bool state)
     {
         isKnockedBack = state;
     }
 
-    // ----------------------------------------------------
-    // --- MÉTODOS DO POWER UP ---
-    // ----------------------------------------------------
-
-    /// <summary>
-    /// Ativa um buff temporário de velocidade e salto.
-    /// Chamado por um PowerUp.cs ou similar.
-    /// </summary>
-    public void ActivateSpeedJumpBuff(float speedMultiplier, float jumpMultiplier, float duration)
+    // ----------------------------------------------------
+    // --- MÉTODOS DO POWER UP (Inalterados) ---
+    // ----------------------------------------------------
+    public void ActivateSpeedJumpBuff(float speedMultiplier, float jumpMultiplier, float duration)
     {
-        // Garante que só o dono local ativa o buff
-        if (pv != null && !pv.IsMine) return;
+        if (pv != null && !pv.IsMine) return;
 
-        // Se já houver um buff ativo, para o anterior e reseta os stats.
         if (currentBuffRoutine != null)
         {
             StopCoroutine(currentBuffRoutine);
             ResetStats();
         }
 
-        // Inicia a nova corrotina
-        currentBuffRoutine = StartCoroutine(BuffRoutine(duration, speedMultiplier, jumpMultiplier));
+        currentBuffRoutine = StartCoroutine(BuffRoutine(duration, speedMultiplier, jumpMultiplier));
     }
 
     private IEnumerator BuffRoutine(float duration, float speedMult, float jumpMult)
     {
-        // Aplica os multiplicadores aos valores base
-        walkSpeed = defaultWalkSpeed * speedMult;
+        walkSpeed = defaultWalkSpeed * speedMult;
         sprintSpeed = defaultSprintSpeed * speedMult;
         jumpForce = defaultJumpForce * jumpMult;
 
-        // NOVO: 1. ATIVA o ícone de velocidade (ID 17)
         if (speedIconAnimator != null)
         {
             speedIconAnimator.SetBool("IsBuffActive", true);
         }
 
-        // Opcional: Adicionar efeitos visuais/sonoros aqui
+        yield return new WaitForSeconds(duration);
 
-        yield return new WaitForSeconds(duration);
-
-        // O tempo acabou, resetar stats
-        ResetStats();
+        ResetStats();
         currentBuffRoutine = null;
 
-        // NOVO: 2. DESATIVA o ícone de velocidade (ID 17)
         if (speedIconAnimator != null)
         {
             speedIconAnimator.SetBool("IsBuffActive", false);
@@ -156,43 +141,30 @@ public class Movement2D : MonoBehaviourPunCallbacks
 
     private void ResetStats()
     {
-        // Volta aos valores base
-        walkSpeed = defaultWalkSpeed;
+        walkSpeed = defaultWalkSpeed;
         sprintSpeed = defaultSprintSpeed;
         jumpForce = defaultJumpForce;
-
-        // Opcional: Remover efeitos visuais/sonoros aqui
-    }
-    // ----------------------------------------------------
+    }
+    // ----------------------------------------------------
 
 
-    void Update()
+    void Update()
     {
-        // BLOQUEIO 1: Multiplayer (Apenas o jogador local deve controlar)
-        if (pv != null && !pv.IsMine) return;
+        // BLOQUEIO 1: Multiplayer
+        if (pv != null && !pv.IsMine) return;
 
-        // B. Verificação de Chão
-        if (groundCheck != null)
+        // B. Verificação de Chão
+        if (groundCheck != null)
         {
             grounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
         }
 
-        bool isDefending = (combatSystem != null && combatSystem.isDefending);
-
-        // Bloqueio do Chat: (Opcional)
-        bool isChatOpen = (chatInstance != null && chatInstance.IsChatOpen);
-
-        // Bloqueio da Pausa: (Opcional)
-        // bool isPaused = (PMMM.instance != null && PMMM.IsPausedLocally); 
-        bool isPaused = false;
-
         // ==========================================================
-        // *** CORREÇÃO: PRIORIDADE AO KNOCKBACK ***
-        // Se estiver a sofrer Knockback, sai imediatamente para deixar o impulso do Health.cs dominar a física.
+        // *** PRIORIDADE AO KNOCKBACK ***
         if (isKnockedBack)
         {
             if (anim) anim.SetBool("Grounded", grounded);
-            return;
+            return; // Bloqueia todo o input
         }
         // ==========================================================
 
@@ -200,14 +172,23 @@ public class Movement2D : MonoBehaviourPunCallbacks
         // BLOQUEIO 2: ESTADOS DE JOGO (LOBBY, PAUSA, CHAT, DEFESA)
         // ----------------------------------------------------
 
-        // A. Bloqueio do Lobby
-        // bool lobbyBlocking = (LobbyManager.instance != null && !LobbyManager.GameStartedAndPlayerCanMove);
-        bool lobbyBlocking = false;
+        // A. Flag de Defesa (se o CombatSystem existir)
+        bool isDefending = (combatSystem != null && combatSystem.isDefending);
 
+        // B. Bloqueio do Chat
+        bool isChatOpen = (chatInstance != null && chatInstance.IsChatOpen);
+
+        // C. Bloqueio da Pausa (Usa a flag estática do PMMM)
+        bool isPaused = PMMM.IsPausedLocally; 
+
+        // D. Bloqueio do Lobby (Usa a flag estática do LobbyManager)
+        bool lobbyBlocking = (LobbyManager.instance != null && !LobbyManager.GameStartedAndPlayerCanMove);
+
+        // Se QUALQUER uma das condições de BLOQUEIO TOTAL (Lobby, Pausa, Chat) OU DE DEFESA estiver ativa
         if (lobbyBlocking || isPaused || isChatOpen || isDefending)
         {
-            // Garante que o jogador para horizontalmente
-            if (rb != null)
+            // O jogador deve PARAR de se mover horizontalmente
+            if (rb != null)
             {
                 rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
             }
@@ -217,12 +198,14 @@ public class Movement2D : MonoBehaviourPunCallbacks
                 anim.SetBool("IsSprinting", false);
             }
 
-            // Se for bloqueio total (Lobby, Pausa, Chat), ignora o resto do input
+            // Se for bloqueio TOTAL (Lobby, Pausa, Chat), ignora o resto do input (incluindo o salto)
             if (lobbyBlocking || isPaused || isChatOpen)
             {
                 if (anim) anim.SetBool("Grounded", grounded);
-                return;
+                return; 
             }
+            
+            // NOTA: Se for apenas isDefending, o jogador pode continuar o fluxo para poder saltar.
         }
 
         // LÓGICA DE RESET DE SALTO
@@ -239,44 +222,43 @@ public class Movement2D : MonoBehaviourPunCallbacks
             }
         }
 
+        // --- LÓGICA DE MOVIMENTO E SALTO (SÓ se NÃO estiver sob Knockback, Bloqueio Total ou a defender) ---
         float move = 0f;
 
-        // LÓGICA DE MOVIMENTO E SALTO (SÓ se NÃO estiver a defender/bloqueado)
-
-        // Movimento horizontal
-        move = Input.GetAxisRaw("Horizontal");
-        sprinting = Input.GetKey(KeyCode.LeftShift);
-
-        float currentSpeed = sprinting ? sprintSpeed : walkSpeed;
-
-        // Aplica a velocidade de movimento
-        if (Mathf.Abs(move) > 0.05f)
+        // Movimento horizontal (Bloqueado se isDefending=true e o bloqueio total=false)
+        if (!isDefending)
         {
-            // Aplica a nova velocidade horizontal, mantendo a vertical
-            rb.linearVelocity = new Vector2(move * currentSpeed, rb.linearVelocity.y);
-        }
-        else
-        {
-            // Se não houver input, parar o movimento horizontal
-            if (!isTouchingWall || grounded)
+            move = Input.GetAxisRaw("Horizontal");
+            sprinting = Input.GetKey(KeyCode.LeftShift);
+
+            float currentSpeed = sprinting ? sprintSpeed : walkSpeed;
+
+            // Aplica a velocidade de movimento
+            if (Mathf.Abs(move) > 0.05f)
             {
-                // Garante que o jogador para se não houver input
-                rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+                rb.linearVelocity = new Vector2(move * currentSpeed, rb.linearVelocity.y);
+            }
+            else
+            {
+                // Se não houver input, parar o movimento horizontal
+                if (!isTouchingWall || grounded)
+                {
+                    rb.linearVelocity = new Vector2(0f, rb.linearVelocity.y);
+                }
             }
         }
 
-        // Salto com W (duplo salto) ou barra de espaço
-        bool jumpInput = Input.GetKeyDown(KeyCode.W) || Input.GetButtonDown("Jump");
+        // Salto com W (duplo salto) ou barra de espaço (Permitido mesmo durante a Defesa)
+        bool jumpInput = Input.GetKeyDown(KeyCode.W) || Input.GetButtonDown("Jump");
 
         if (jumpInput && jumpCount < maxJumps)
         {
-            // Resetar a velocidade vertical antes de aplicar a nova força de pulo para consistência
-            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+            rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
             jumpCount++;
         }
 
-        // Flip do sprite
-        if (spriteRenderer != null)
+        // Flip do sprite
+        if (spriteRenderer != null)
         {
             if (move > 0.05f)
                 spriteRenderer.flipX = false;
@@ -284,9 +266,10 @@ public class Movement2D : MonoBehaviourPunCallbacks
                 spriteRenderer.flipX = true;
         }
 
-        // Atualizar Animator
-        if (anim)
+        // Atualizar Animator
+        if (anim)
         {
+            // O Speed deve ser 0 se estiver a defender, mesmo que o isDefending não tenha sido o bloqueio principal
             anim.SetFloat("Speed", isDefending ? 0f : Mathf.Abs(move));
             anim.SetBool("Grounded", grounded);
             bool isSprintAnim = !isDefending && sprinting && Mathf.Abs(move) > 0.05f;
@@ -294,47 +277,32 @@ public class Movement2D : MonoBehaviourPunCallbacks
         }
     }
 
-    // --- LÓGICA DE COLISÃO (Ground/Wall Check e Stomp) ---
-    // ===========================================
-    // MÉTODO ONCOLLISIONENTER2D ATUALIZADO (ID 14)
-    // ===========================================
-    private void OnCollisionEnter2D(Collision2D collision)
+    // --- LÓGICA DE COLISÃO (OnCollisionEnter2D, OnCollisionStay2D, OnCollisionExit2D e Gizmos inalterados) ---
+    private void OnCollisionEnter2D(Collision2D collision)
     {
-        // 1. **VERIFICAR STOMP CONTRA INIMIGO**
-        // Apenas o jogador local deve lidar com a física do Stomp
         if (pv != null && pv.IsMine && collision.gameObject.CompareTag(enemyTag))
         {
             if (collision.contactCount > 0)
             {
                 ContactPoint2D contact = collision.GetContact(0);
 
-                // 1.1. Verifica se a colisão veio de CIMA (Normal Y alta)
                 if (contact.normal.y > minStompNormalY)
                 {
-                    // LÓGICA DE STOMP BEM-SUCEDIDA! (JOGADOR GERE O DANO)
-
-                    // A. Causar dano ao inimigo via RPC
                     PhotonView enemyView = collision.gameObject.GetComponent<PhotonView>();
                     if (enemyView != null)
                     {
-                        // Chamamos o RPC de dano no inimigo, enviando o nosso ID (pv.ViewID)
                         enemyView.RPC("TakeDamage", RpcTarget.MasterClient, stompDamage, pv.ViewID);
                     }
 
-                    // B. Aplicar o salto (bounce) no jogador
                     rb.linearVelocity = new Vector2(rb.linearVelocity.x, 0f);
                     rb.AddForce(Vector2.up * stompForce, ForceMode2D.Impulse);
 
-                    // Saímos imediatamente para não processar como colisão normal de chão
                     return;
                 }
-
-                // 1.2. Colisão Lateral/Baixo: Se não for stomp, o Player leva dano (assumimos que o inimigo trata disso)
             }
         }
 
-        // 2. **LÓGICA NORMAL DE COLISÃO (CHÃO E PAREDE)**
-        if (((1 << collision.gameObject.layer) & groundLayer) != 0)
+        if (((1 << collision.gameObject.layer) & groundLayer) != 0)
         {
             if (collision.contactCount > 0)
             {
@@ -380,13 +348,10 @@ public class Movement2D : MonoBehaviourPunCallbacks
     {
         if (((1 << collision.gameObject.layer) & groundLayer) != 0)
         {
-            // Verifica se está realmente a sair do chão/parede (simplificação)
-            isTouchingWall = false;
-            // Nota: O estado 'grounded' é tratado pelo Physics2D.OverlapCircle no Update()
+            isTouchingWall = false;
         }
     }
 
-    // Gizmos
     void OnDrawGizmosSelected()
     {
         if (groundCheck != null)
