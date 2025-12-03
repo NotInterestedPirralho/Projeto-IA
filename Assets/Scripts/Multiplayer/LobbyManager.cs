@@ -34,7 +34,8 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     public Button startGameButton;
 
     [Header("Game References")]
-    public GameObject gameChatPrefab;
+    // ATENÇÃO: Referencie aqui o GameChat que já está na sua cena (desativado)
+    public GameObject gameChatObject; 
 
     private void Awake()
     {
@@ -46,6 +47,23 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         {
             startGameButton.onClick.AddListener(OnForceStartGame);
             startGameButton.gameObject.SetActive(false);
+        }
+    }
+
+    void Update()
+    {
+        if (lobbyPanel == null || hasGameStartedLocally) return;
+        if (!PhotonNetwork.InRoom || !isCountingDown) return;
+
+        double elapsed = PhotonNetwork.Time - startTime;
+        elapsed = System.Math.Max(0.0, elapsed);
+        remainingTime = Mathf.Max(0f, countdownDuration - (float)elapsed);
+
+        UpdateCountdownUI(remainingTime);
+
+        if (PhotonNetwork.IsMasterClient && remainingTime <= 0.01f && startTime > 0)
+        {
+            StartGame();
         }
     }
 
@@ -64,23 +82,6 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         if (PhotonNetwork.IsMasterClient) CheckStartConditions();
         UpdateLobbyUI();
         UpdateCountdownUI(remainingTime);
-    }
-
-    void Update()
-    {
-        if (lobbyPanel == null || hasGameStartedLocally) return;
-        if (!PhotonNetwork.InRoom || !isCountingDown) return;
-
-        double elapsed = PhotonNetwork.Time - startTime;
-        elapsed = System.Math.Max(0.0, elapsed);
-        remainingTime = Mathf.Max(0f, countdownDuration - (float)elapsed);
-
-        UpdateCountdownUI(remainingTime);
-
-        if (PhotonNetwork.IsMasterClient && remainingTime <= 0.01f && startTime > 0)
-        {
-            StartGame();
-        }
     }
 
     public override void OnPlayerEnteredRoom(Player newPlayer)
@@ -209,8 +210,9 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
         if (lobbyPanel != null) lobbyPanel.SetActive(false);
 
-        // Instancia o chat
-        if (gameChatPrefab != null) Instantiate(gameChatPrefab);
+        // ** LINHA CORRIGIDA: Usa SetActive(true) em vez de Instantiate para evitar o erro de ID duplicado. **
+        // Certifique-se de que o objeto 'gameChatObject' está referenciado no Inspector e está na cena (desativado).
+        if (gameChatObject != null) gameChatObject.SetActive(true);
 
         // === INICIA O JOGO NO ROOM MANAGER ===
         // Esta é a única chamada necessária. O RoomManager trata do spawn e da câmara.
