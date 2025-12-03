@@ -34,7 +34,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     public Button startGameButton;
 
     [Header("Game References")]
-    // ATENÇÃO: Referencie aqui o GameChat que já está na sua cena (desativado)
+    // Objeto do GameChat que já está na cena, desativado no Inspector
     public GameObject gameChatObject; 
 
     private void Awake()
@@ -79,6 +79,10 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         }
 
         lobbyPanel.SetActive(true);
+        
+        // ⭐ ATIVAÇÃO DO CHAT: Liga o chat assim que o jogador entra na sala.
+        ToggleChatVisibility(true); 
+
         if (PhotonNetwork.IsMasterClient) CheckStartConditions();
         UpdateLobbyUI();
         UpdateCountdownUI(remainingTime);
@@ -209,13 +213,11 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         GameStartedAndPlayerCanMove = true;
 
         if (lobbyPanel != null) lobbyPanel.SetActive(false);
-
-        // ** LINHA CORRIGIDA: Usa SetActive(true) em vez de Instantiate para evitar o erro de ID duplicado. **
-        // Certifique-se de que o objeto 'gameChatObject' está referenciado no Inspector e está na cena (desativado).
-        if (gameChatObject != null) gameChatObject.SetActive(true);
+        
+        // ⭐ DESATIVAÇÃO DO CHAT: Desliga o chat porque o lobby está a fechar e o jogo está a começar.
+        ToggleChatVisibility(false); 
 
         // === INICIA O JOGO NO ROOM MANAGER ===
-        // Esta é a única chamada necessária. O RoomManager trata do spawn e da câmara.
         if (RoomManager.instance != null)
         {
             RoomManager.instance.StartGame();
@@ -230,6 +232,15 @@ public class LobbyManager : MonoBehaviourPunCallbacks
         Debug.Log("[Lobby] Jogo iniciado localmente.");
     }
 
+    // Função para controlar a visibilidade do Chat
+    private void ToggleChatVisibility(bool isVisible)
+    {
+        if (gameChatObject != null)
+        {
+            gameChatObject.SetActive(isVisible);
+        }
+    }
+    
     private void UpdateLobbyUI()
     {
         if (!PhotonNetwork.InRoom) return;
