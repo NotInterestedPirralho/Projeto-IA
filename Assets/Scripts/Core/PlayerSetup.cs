@@ -5,108 +5,108 @@ using UnityEngine;
 // Implementa IPunObservable para sincronização de dados de animação
 public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
 {
+    [Header("Componentes Obrigatórios")]
     public Movement2D movement;
-    public GameObject camara;
+    public GameObject camara; // ARRASTA A CÂMARA DO BONECO PARA AQUI NO PREFAB
     public CombatSystem2D combat;
-    public string nickname;
-    public TextMeshPro nicknameText; // Usando TextMeshPro para o Nickname flutuante
-    
-    // --- NOVO: Referência ao Sprite Renderer ---
-    private SpriteRenderer spriteRenderer; 
 
-    // Referências de sincronização
+    [Header("UI")]
+    public string nickname;
+    public TextMeshPro nicknameText;
+
+    // Referências Privadas
+    private SpriteRenderer spriteRenderer;
     private PhotonView photonView;
     private Animator anim;
 
-    // Variáveis usadas para interpolar animação em clientes remotos
+    // Variáveis de Sincronização
     private float syncSpeed;
     private bool syncGrounded;
-    // --- NOVO: Variáveis de Sincronização ---
-    private bool syncFlipX; 
+    private bool syncFlipX;
     private bool syncIsDefending;
 
-    void Start()
+    private void Awake()
     {
         photonView = GetComponent<PhotonView>();
         anim = GetComponent<Animator>();
-        // Obtém a referência do SpriteRenderer
-        spriteRenderer = GetComponent<SpriteRenderer>(); 
+        spriteRenderer = GetComponent<SpriteRenderer>();
+    }
 
-        // Apenas o cliente local deve processar o input, ativar a câmara, etc.
+    void Start()
+    {
+        // Se for o meu boneco...
         if (photonView.IsMine)
         {
+            // Chamamos a configuração local
             IsLocalPlayer();
         }
-        else // Cliente Remoto
+        else // Se for boneco de outro jogador...
         {
-            // Desativa o controle e o combate nos clientes remotos
-            if (movement != null) movement.enabled = false;
-            if (combat != null) combat.enabled = false;
-
-            // Certifique-se de que a câmara não está ativa em jogadores remotos
-            if (camara != null) camara.SetActive(false);
+            DisableRemotePlayer();
         }
     }
 
-    // Chamado pelo Room Manager para configurar o jogador local
+    // Chamado para configurar o JOGADOR LOCAL (EU)
     public void IsLocalPlayer()
     {
-        // Ativa os scripts de input
-        if (movement != null) movement.enabled = true;
+        Debug.Log($"[PlayerSetup] Configurando jogador local: {gameObject.name}");
 
-        // Ativa a câmara
+        if (movement != null) movement.enabled = true;
+        if (combat != null) combat.enabled = true;
+
+        // ATIVAÇÃO DA CÂMARA
         if (camara != null)
         {
+            Debug.Log("[PlayerSetup] A ativar Câmara do Jogador.");
             camara.SetActive(true);
 
-            // Inicia o zoom dinâmico quando a câmara for ativada
-            var zoomDynamic = camara.GetComponent<CameraDynamicZoom>();
-            if (zoomDynamic != null)
-                zoomDynamic.enabled = true;
-        }
+            // Garante que o AudioListener está ligado para ouvires o jogo
+            AudioListener listener = camara.GetComponent<AudioListener>();
+            if (listener != null) listener.enabled = true;
 
-        // Enable combat system for the local player only
-        if (combat != null)
-            combat.enabled = true;
+            // Zoom Dinâmico
+            var zoomDynamic = camara.GetComponent<CameraDynamicZoom>();
+            if (zoomDynamic != null) zoomDynamic.enabled = true;
+        }
+        else
+        {
+            Debug.LogError("[PlayerSetup] ERRO CRÍTICO: A variável 'camara' não está associada no Inspector do Prefab!");
+        }
     }
 
-    // --- SINCRONIZAÇÃO DE ANIMAÇÃO E ESTADO PARA JOGADORES REMOTOS ---
+    // Chamado para configurar JOGADORES REMOTOS (OUTROS)
+    public void DisableRemotePlayer()
+    {
+        if (movement != null) movement.enabled = false;
+        if (combat != null) combat.enabled = false;
+
+        // Garante que a câmara dos outros está DESLIGADA
+        if (camara != null)
+        {
+            camara.SetActive(false);
+
+            // Desliga também o AudioListener dos outros para não ouvires o mundo da posição deles
+            AudioListener listener = camara.GetComponent<AudioListener>();
+            if (listener != null) listener.enabled = false;
+        }
+    }
+
+    // --- SINCRONIZAÇÃO (Mantive igual ao teu, está correto) ---
 
     void Update()
     {
-        // Se não for o seu objeto, aplica as animações sincronizadas
         if (!photonView.IsMine)
         {
             if (anim)
             {
-                // Aplica os valores sincronizados recebidos no OnPhotonSerializeView
-                // 1. Sincroniza o parâmetro de Corrida
-                anim.SetFloat("Speed", syncSpeed); 
-                
-                // 2. Sincroniza o parâmetro de Chão
+                anim.SetFloat("Speed", syncSpeed);
                 anim.SetBool("Grounded", syncGrounded);
-                
-                // 3. NOVO: Sincroniza o parâmetro de Defesa
                 anim.SetBool("IsDefending", syncIsDefending);
 
-                // Nota: O parâmetro "IsSprinting" é tipicamente ligado à velocidade, 
-                // mas pode ser sincronizado se a animação for distinta (por agora, usamos a velocidade syncSpeed).
-
-                // 4. NOVO: Sincroniza o Flip do Sprite
                 if (spriteRenderer != null)
                 {
                     spriteRenderer.flipX = syncFlipX;
                 }
-            }
-        }
-        else
-        {
-            // NOVO: Garantir que o Animator do jogador local está sempre a par do estado de Defesa
-            if (combat != null && anim)
-            {
-                 // Nota: A lógica de Attack/Defense no CombatSystem2D já deve usar o RPC (SetDefenseState)
-                 // que corre em todos os clientes. No entanto, o OnPhotonSerializeView ainda é útil
-                 // para garantir que novos jogadores que entram na sala vejam o estado correto.
             }
         }
     }
@@ -115,41 +115,21 @@ public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
     {
         if (stream.IsWriting)
         {
-            // --- O JOGADOR LOCAL ESTÁ A ENVIAR DADOS ---
-
-            // 1. Velocidade Horizontal (para animação de corrida)
+            // ENVIA DADOS
             stream.SendNext(movement.CurrentHorizontalSpeed);
-            
-            // 2. Estado no Chão
             stream.SendNext(movement.IsGrounded);
-            
-            // 3. NOVO: Estado de Defesa
             stream.SendNext(combat != null && combat.isDefending);
 
-            // 4. NOVO: Flip do Sprite
-            if (spriteRenderer != null)
-            {
-                 stream.SendNext(spriteRenderer.flipX);
-            }
+            if (spriteRenderer != null) stream.SendNext(spriteRenderer.flipX);
         }
         else
         {
-            // --- O JOGADOR REMOTO ESTÁ A RECEBER DADOS ---
-
-            // 1. Velocidade Horizontal
+            // RECEBE DADOS
             this.syncSpeed = (float)stream.ReceiveNext();
-            
-            // 2. Estado no Chão
             this.syncGrounded = (bool)stream.ReceiveNext();
-            
-            // 3. NOVO: Estado de Defesa
             this.syncIsDefending = (bool)stream.ReceiveNext();
-            
-            // 4. NOVO: Flip do Sprite
-            if (spriteRenderer != null)
-            {
-                 this.syncFlipX = (bool)stream.ReceiveNext();
-            }
+
+            if (spriteRenderer != null) this.syncFlipX = (bool)stream.ReceiveNext();
         }
     }
 
@@ -157,11 +137,6 @@ public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
     public void SetNickname(string _nickname)
     {
         nickname = _nickname;
-        
-        // Atribui o nickname ao TextMeshPro flutuante
-        if (nicknameText != null)
-        {
-            nicknameText.text = nickname;
-        }
+        if (nicknameText != null) nicknameText.text = nickname;
     }
 }
