@@ -4,6 +4,7 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 using Photon.Realtime;
 using UnityEngine.SceneManagement;
 using Photon.Pun.UtilityScripts;
+using System.Collections; // Necessário para Corrotinas
 
 public class RoomManager : MonoBehaviourPunCallbacks
 {
@@ -16,11 +17,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
     private string sceneToLoadOnLeave = "";
 
     [Header("Player and Spawn")]
-    public GameObject player;
+    public GameObject player; // (Opcional, visto que usamos Resources)
     public Transform[] spawnPoints;
 
     [Header("UI References")]
-    public GameObject roomCam;      // Câmara do Lobby/Espectador
+    public GameObject roomCam;      // Câmara do Lobby/Espectador (ARRASRA A TUA CÂMARA DE CENA AQUI)
     public GameObject nameUI;       // Menu de Nome
     public GameObject connectigUI;  // Texto "Connecting..."
 
@@ -75,7 +76,6 @@ public class RoomManager : MonoBehaviourPunCallbacks
         };
         ro.CustomRoomPropertiesForLobby = new[] { "mapSceneIndex", "mapName" };
 
-        // Nome da sala fixo para todos entrarem na mesma (sem random)
         string roomName = "Room_" + mapName;
         PhotonNetwork.JoinOrCreateRoom(roomName, ro, typedLobby: null);
     }
@@ -129,20 +129,26 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         Debug.Log("O Jogo PvP Começou!");
 
-        // Desliga a câmara de espera
-        if (roomCam != null) roomCam.SetActive(false);
+        // Garante que a câmara de sala está ativa antes de spawnar, para evitar flickers
+        if (roomCam != null) roomCam.SetActive(true);
 
         // Faz o spawn do jogador (Guerreiro)
         RespawnPlayer();
 
-        // NOTA: Como é PvP, não há spawn de inimigos AI aqui.
+        // Desliga a câmara de espera APÓS spawnar
+        if (roomCam != null) roomCam.SetActive(false);
     }
 
     // --- SISTEMA DE MORTE E VIDAS (LOCAL) ---
     public void HandleMyDeath()
     {
+        // 1. ATIVA IMEDIATAMENTE A CÂMARA DE ESPECTADOR
+        // Isto impede o erro "Display 1 No cameras rendering"
+        if (roomCam != null) roomCam.SetActive(true);
+
         int currentRespawns = GetRespawnCount(PhotonNetwork.LocalPlayer);
 
+        // Retira uma vida
         if (currentRespawns >= 0)
         {
             currentRespawns--;
@@ -150,17 +156,32 @@ public class RoomManager : MonoBehaviourPunCallbacks
             PhotonNetwork.LocalPlayer.SetCustomProperties(props);
         }
 
+        // Verifica se ainda pode fazer respawn
         if (currentRespawns >= 0)
         {
-            Debug.Log($"A fazer respawn... Vidas restantes: {currentRespawns}");
-            RespawnPlayer();
+            Debug.Log($"A preparar respawn... Vidas restantes: {currentRespawns}");
+            // Inicia o temporizador de respawn (3 segundos)
+            StartCoroutine(RespawnCoroutine(3.0f));
         }
         else
         {
             Debug.Log("Vidas esgotadas! GAME OVER.");
-            if (roomCam != null) roomCam.SetActive(true); // Liga câmara de espectador
-            if (endScreen != null) endScreen.ShowDefeat(); // Mostra Derrota
+            // A câmara já está ativa, mostramos o UI de derrota
+            if (endScreen != null) endScreen.ShowDefeat();
         }
+    }
+
+    // --- NOVA CORROTINA DE RESPAWN ---
+    private IEnumerator RespawnCoroutine(float delay)
+    {
+        // Espera X segundos
+        yield return new WaitForSeconds(delay);
+
+        // Cria o novo boneco
+        RespawnPlayer();
+
+        // Desliga a câmara de espectador porque o novo boneco já tem a dele
+        if (roomCam != null) roomCam.SetActive(false);
     }
 
     // --- VERIFICAÇÃO DE VITÓRIA (PvP - Last Man Standing) ---
@@ -172,7 +193,6 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     public override void OnPlayerPropertiesUpdate(Player targetPlayer, Hashtable changedProps)
     {
-        // Se alguém perdeu uma vida, vamos ver se só sobro eu
         if (changedProps.ContainsKey(RESPAWN_COUNT_KEY))
         {
             CheckWinCondition();
@@ -181,26 +201,20 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     private void CheckWinCondition()
     {
-        // 1. Se eu já perdi (vidas < 0), nunca posso ganhar
         if (GetRespawnCount(PhotonNetwork.LocalPlayer) < 0) return;
 
-        // 2. Conta quantos jogadores estão VIVOS na sala (incluindo eu)
         int activePlayers = 0;
         foreach (Player p in PhotonNetwork.PlayerList)
         {
             if (GetRespawnCount(p) >= 0) activePlayers++;
         }
 
-        // 3. Verifica se o jogo já começou oficialmente (para não ganhar no lobby de espera)
         bool gameStarted = false;
         if (PhotonNetwork.CurrentRoom.CustomProperties.ContainsKey("gs"))
         {
             gameStarted = (bool)PhotonNetwork.CurrentRoom.CustomProperties["gs"];
         }
 
-        // 4. CONDIÇÃO DE VITÓRIA:
-        // - O jogo já começou
-        // - E só sobra 1 jogador vivo (EU)
         if (gameStarted && activePlayers == 1)
         {
             Debug.Log("VITÓRIA! És o único sobrevivente (Last Man Standing).");
@@ -220,34 +234,25 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     public void RespawnPlayer()
     {
-        // 1. Verifica se temos pontos de spawn
         if (spawnPoints == null || spawnPoints.Length == 0)
         {
             Debug.LogError("[RoomManager] Erro: Sem pontos de spawn!");
             return;
         }
 
-        // --- AQUI ESTAVA O ERRO ---
-        // Antigamente tinhas aqui: if (player == null) return;
-        // REMOVEMOS ISSO porque agora carregamos por NOME, não pelo Inspector.
-
         int playerIndex = GetPlayerIndex(PhotonNetwork.LocalPlayer);
         int spawnIndex = playerIndex % spawnPoints.Length;
         Transform spawnPoint = spawnPoints[spawnIndex];
 
-        // 2. Determina qual boneco criar
+        // Vai buscar o nome do boneco guardado
         string charName = PlayerPrefs.GetString("SelectedCharacter", "Soldier");
-
-        // Proteção extra: se o nome vier vazio ou errado, usa Soldier
-        if (string.IsNullOrEmpty(charName) || charName == "None")
-            charName = "Soldier";
+        if (string.IsNullOrEmpty(charName) || charName == "None") charName = "Soldier";
 
         Debug.Log($"[RoomManager] A fazer spawn de: {charName}");
 
-        // 3. Cria o boneco
+        // IMPORTANTE: O ficheiro 'charName' (ex: Soldier) TEM de estar numa pasta chamada "Resources"
         GameObject _player = PhotonNetwork.Instantiate(charName, spawnPoint.position, Quaternion.identity);
 
-        // 4. Configurações
         _player.GetComponent<PlayerSetup>()?.IsLocalPlayer();
 
         Health h = _player.GetComponent<Health>();
@@ -259,6 +264,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
             PhotonNetwork.LocalPlayer.NickName = nickName;
         }
     }
+
     // --- UTILITÁRIOS ---
     private int GetRespawnCount(Player player)
     {
