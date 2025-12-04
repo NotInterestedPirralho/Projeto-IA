@@ -4,7 +4,8 @@ using Hashtable = ExitGames.Client.Photon.Hashtable;
 using Photon.Realtime;
 using UnityEngine.SceneManagement;
 using Photon.Pun.UtilityScripts;
-using System.Collections; // Necessário para Corrotinas
+using System.Collections;
+using TMPro; // Caso estejas a usar TextMeshPro nalguma UI aqui
 
 public class RoomManager : MonoBehaviourPunCallbacks
 {
@@ -21,9 +22,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
     public Transform[] spawnPoints;
 
     [Header("UI References")]
-    public GameObject roomCam;      // Câmara do Lobby/Espectador (ARRASRA A TUA CÂMARA DE CENA AQUI)
-    public GameObject nameUI;       // Menu de Nome
-    public GameObject connectigUI;  // Texto "Connecting..."
+    // IMPORTANTE: Coloca esta Câmara como FILHA (Child) do objeto RoomManager na hierarquia
+    // para ela não se perder quando mudas de cena.
+    public GameObject roomCam;
+    public GameObject nameUI;
+    public GameObject connectigUI;
 
     // ARRASTA O TEU HUDCANVAS PARA AQUI
     public MultiplayerEndScreen endScreen;
@@ -36,6 +39,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     void Awake()
     {
+        // Padrão Singleton com DontDestroyOnLoad
         if (instance != null && instance != this)
         {
             Destroy(this.gameObject);
@@ -91,7 +95,11 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
     // --- CALLBACKS PHOTON ---
     public override void OnConnectedToMaster() { JoinRoomLogic(); }
-    public override void OnDisconnected(DisconnectCause cause) { if (connectigUI != null) connectigUI.SetActive(false); if (nameUI != null) nameUI.SetActive(true); }
+    public override void OnDisconnected(DisconnectCause cause)
+    {
+        if (connectigUI != null) connectigUI.SetActive(false);
+        if (nameUI != null) nameUI.SetActive(true);
+    }
 
     public override void OnJoinedRoom()
     {
@@ -129,7 +137,7 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         Debug.Log("O Jogo PvP Começou!");
 
-        // Garante que a câmara de sala está ativa antes de spawnar, para evitar flickers
+        // Garante que a câmara de sala está ativa antes de spawnar
         if (roomCam != null) roomCam.SetActive(true);
 
         // Faz o spawn do jogador (Guerreiro)
@@ -140,11 +148,22 @@ public class RoomManager : MonoBehaviourPunCallbacks
     }
 
     // --- SISTEMA DE MORTE E VIDAS (LOCAL) ---
+    // --- SISTEMA DE MORTE E VIDAS (LOCAL) ---
     public void HandleMyDeath()
     {
-        // 1. ATIVA IMEDIATAMENTE A CÂMARA DE ESPECTADOR
-        // Isto impede o erro "Display 1 No cameras rendering"
-        if (roomCam != null) roomCam.SetActive(true);
+        Debug.Log("[RoomManager] HandleMyDeath chamado.");
+
+        // 1. TENTA ATIVAR A CÂMARA DE ESPECTADOR
+        if (roomCam != null)
+        {
+            roomCam.SetActive(true);
+        }
+
+        // --- CORREÇÃO AQUI ---
+        // Garante que o menu de login e conexão desaparecem enquanto estás morto
+        if (nameUI != null) nameUI.SetActive(false);
+        if (connectigUI != null) connectigUI.SetActive(false);
+        // ---------------------
 
         int currentRespawns = GetRespawnCount(PhotonNetwork.LocalPlayer);
 
@@ -160,13 +179,12 @@ public class RoomManager : MonoBehaviourPunCallbacks
         if (currentRespawns >= 0)
         {
             Debug.Log($"A preparar respawn... Vidas restantes: {currentRespawns}");
-            // Inicia o temporizador de respawn (3 segundos)
+            // Inicia o temporizador de 3 segundos
             StartCoroutine(RespawnCoroutine(3.0f));
         }
         else
         {
             Debug.Log("Vidas esgotadas! GAME OVER.");
-            // A câmara já está ativa, mostramos o UI de derrota
             if (endScreen != null) endScreen.ShowDefeat();
         }
     }
@@ -180,7 +198,10 @@ public class RoomManager : MonoBehaviourPunCallbacks
         // Cria o novo boneco
         RespawnPlayer();
 
-        // Desliga a câmara de espectador porque o novo boneco já tem a dele
+        // FIX: Espera 1 frame para garantir que o Start do Player correu e ativou a câmara dele
+        yield return null;
+
+        // Desliga a câmara de espectador
         if (roomCam != null) roomCam.SetActive(false);
     }
 
@@ -236,12 +257,16 @@ public class RoomManager : MonoBehaviourPunCallbacks
     {
         if (spawnPoints == null || spawnPoints.Length == 0)
         {
-            Debug.LogError("[RoomManager] Erro: Sem pontos de spawn!");
+            Debug.LogError("[RoomManager] Erro: Array 'spawnPoints' está vazio!");
             return;
         }
 
         int playerIndex = GetPlayerIndex(PhotonNetwork.LocalPlayer);
         int spawnIndex = playerIndex % spawnPoints.Length;
+
+        // Verificação extra para evitar IndexOutOfRange
+        if (spawnIndex >= spawnPoints.Length) spawnIndex = 0;
+
         Transform spawnPoint = spawnPoints[spawnIndex];
 
         // Vai buscar o nome do boneco guardado
@@ -250,18 +275,30 @@ public class RoomManager : MonoBehaviourPunCallbacks
 
         Debug.Log($"[RoomManager] A fazer spawn de: {charName}");
 
-        // IMPORTANTE: O ficheiro 'charName' (ex: Soldier) TEM de estar numa pasta chamada "Resources"
-        GameObject _player = PhotonNetwork.Instantiate(charName, spawnPoint.position, Quaternion.identity);
-
-        _player.GetComponent<PlayerSetup>()?.IsLocalPlayer();
-
-        Health h = _player.GetComponent<Health>();
-        if (h != null) h.isLocalPlayer = true;
-
-        if (_player.GetComponent<PhotonView>() != null)
+        // IMPORTANTE: O ficheiro 'charName' TEM de estar numa pasta chamada "Resources"
+        // Adicionei tratamento de erro aqui para não crashar silenciosamente
+        try
         {
-            _player.GetComponent<PhotonView>().RPC("SetNickname", RpcTarget.AllBuffered, nickName);
-            PhotonNetwork.LocalPlayer.NickName = nickName;
+            GameObject _player = PhotonNetwork.Instantiate(charName, spawnPoint.position, Quaternion.identity);
+
+            if (_player != null)
+            {
+                _player.GetComponent<PlayerSetup>()?.IsLocalPlayer();
+
+                Health h = _player.GetComponent<Health>();
+                if (h != null) h.isLocalPlayer = true;
+
+                if (_player.GetComponent<PhotonView>() != null)
+                {
+                    _player.GetComponent<PhotonView>().RPC("SetNickname", RpcTarget.AllBuffered, nickName);
+                    PhotonNetwork.LocalPlayer.NickName = nickName;
+                }
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[RoomManager] ERRO AO INSTANCIAR JOGADOR: {ex.Message}");
+            Debug.LogError("Dica: Verifica se o Prefab está dentro da pasta 'Resources' e se o nome está correto.");
         }
     }
 
