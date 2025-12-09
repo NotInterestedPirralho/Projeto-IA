@@ -2782,7 +2782,7 @@ MonoBehaviour:
   m_RichText: 1
   m_GlobalFontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_OnFocusSelectAll: 1
-  m_ResetOnDeActivation: 1
+  m_ResetOnDeActivation: 0
   m_KeepTextSelectionVisible: 0
   m_RestoreOriginalTextOnEscape: 1
   m_isRichTextEditingAllowed: 0
@@ -3833,7 +3833,11 @@ MonoBehaviour:
   lobbyPanel: {fileID: 398170208}
   createRoomPanel: {fileID: 653012065}
   roomNameInputField: {fileID: 1457906948}
-  createRoomUIBlocker: {fileID: 533059045}
+  createRoomButtons:
+  - {fileID: 2075195441}
+  - {fileID: 1062127497}
+  - {fileID: 185194622}
+  - {fileID: 303827697}
 --- !u!4 &1680147609
 Transform:
   m_ObjectHideFlags: 0

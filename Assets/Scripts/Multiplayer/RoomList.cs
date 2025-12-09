@@ -5,6 +5,7 @@ using Photon.Pun;
 using Photon.Realtime;
 using TMPro;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class RoomList : MonoBehaviourPunCallbacks
 {
@@ -14,23 +15,98 @@ public class RoomList : MonoBehaviourPunCallbacks
     public Transform roomListParent;
     public GameObject roomListItemPrefab;
 
-    // !!! NOVAS VARI�VEIS ADICIONADAS !!!
-    [Header("UI (Pain�is)")]
-    public GameObject lobbyPanel; // O painel "Choose a game"
-    public GameObject createRoomPanel; // O painel "Pick a room name"
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    [Header("UI (Paineis)")]
+    public GameObject lobbyPanel; 
+    public GameObject createRoomPanel; 
+
+    // --- NOVAS REFERENCIAS ---
+    [Header("UI (Criacao de Sala)")]
+    public TMP_InputField roomNameInputField;
+    public Button[] createRoomButtons;
+    // -------------------------
 
     private List<RoomInfo> cachedRoomList = new List<RoomInfo>();
-    private string cachedRoomNameToCreate;
+    private string cachedRoomNameToCreate = "";
 
     public void ChangeRoomToCreateName(string _roomName)
     {
-        cachedRoomNameToCreate = _roomName;
+        // 1. LER DIRETAMENTE DO INPUT FIELD (CORREÇÃO)
+        if (roomNameInputField != null)
+        {
+            cachedRoomNameToCreate = roomNameInputField.text.Trim();
+        }
+        else
+        {
+            // Se a referência faltar, tratamos o nome como vazio
+            cachedRoomNameToCreate = "";
+        }
+        
+        // 2. DEBUG: Mostra o nome capturado e o seu comprimento
+        Debug.Log("--- INPUT EVENT (ChangeRoomToCreateName) ---");
+        Debug.Log("Nome Capturado: [" + cachedRoomNameToCreate + "]. Comprimento: " + cachedRoomNameToCreate.Length);
+        
+        // 3. Verifica se o nome é válido e ativa/desativa os botões
+        UpdateCreateRoomButtonsState();
+    }
+    
+    public void OnRoomNameEndEdit(string _roomName)
+    {
+        // Garante que o nome armazenado esta atualizado, lendo diretamente do campo
+        if (roomNameInputField != null)
+        {
+            cachedRoomNameToCreate = roomNameInputField.text.Trim();
+        }
+        else
+        {
+            cachedRoomNameToCreate = _roomName.Trim(); // Fallback
+        }
+        
+        UpdateCreateRoomButtonsState(); 
+
+        bool isValidName = !string.IsNullOrEmpty(cachedRoomNameToCreate);
+
+        // Acao opcional: Se o nome for valido, simula um clique no primeiro botao (Arena 1)
+        if (isValidName && createRoomButtons != null && createRoomButtons.Length > 0)
+        {
+            Debug.Log("ENTER PRESSIONADO. Nome válido. Tentando criar sala na Arena 1 (Índice 1).");
+            CreateRoomByIndex(1); 
+        }
+    }
+
+    private void UpdateCreateRoomButtonsState()
+    {
+        // Verifica se o nome tem conteudo (comprimento > 0)
+        bool isValidName = !string.IsNullOrEmpty(cachedRoomNameToCreate);
+
+        // DEBUG: Mostra o resultado da validação e as referências
+        Debug.Log("--- UPDATE BUTTONS STATE ---");
+        Debug.Log("Resultado da Validação: isValidName = " + isValidName);
+        Debug.Log("Botões referenciados no Inspector: " + (createRoomButtons != null ? createRoomButtons.Length.ToString() : "0"));
+
+        if (createRoomButtons == null || createRoomButtons.Length == 0)
+        {
+            Debug.LogError("ERRO: O array 'createRoomButtons' está vazio ou nulo! Arraste os 4 botões para o Inspector.");
+            return;
+        }
+
+        // Ativa ou desativa cada botão de criacao de sala
+        foreach (Button button in createRoomButtons)
+        {
+            if (button != null)
+            {
+                // Os botoes so sao clicaveis se o nome for valido
+                button.interactable = isValidName;
+            }
+            else
+            {
+                Debug.LogWarning("AVISO: Um dos botões no array 'createRoomButtons' é nulo. Verifique as referências.");
+            }
+        }
     }
 
     public void CreateRoomByIndex(int sceneIndex)
     {
-        // Esta fun��o est� perfeita para os teus bot�es "Create Room in Arena 1/2"
+        // Esta função está perfeita para os teus botões "Create Room in Arena 1/2"
         JoinRoomByName(cachedRoomNameToCreate, sceneIndex);
     }
 
@@ -41,10 +117,13 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     IEnumerator Start()
     {
-        // Boa pr�tica: garantir que o painel de lobby est� vis�vel
-        // e o de criar sala est� escondido ao iniciar.
+        // Boa prática: garantir que o painel de lobby está visível
+        // e o de criar sala está escondido ao iniciar.
         if (lobbyPanel != null) lobbyPanel.SetActive(true);
         if (createRoomPanel != null) createRoomPanel.SetActive(false);
+
+        // Desativa os botões ao iniciar, pois o nome da sala está vazio.
+        UpdateCreateRoomButtonsState();
 
         // Precautions
         if (PhotonNetwork.InRoom)
@@ -67,7 +146,6 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     public override void OnRoomListUpdate(List<RoomInfo> roomList)
     {
-        // ... (o resto desta fun��o est� igual e correto) ...
         if (cachedRoomList.Count <= 0)
         {
             cachedRoomList = roomList;
@@ -102,7 +180,6 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     void UpdateUI()
     {
-        // ... (o resto desta fun��o est� igual e correto) ...
         foreach (Transform roomItem in roomListParent)
         {
             Destroy(roomItem.gameObject);
@@ -142,7 +219,7 @@ public class RoomList : MonoBehaviourPunCallbacks
         PlayerPrefs.SetString("RoomNameToJoin", _name);
 
         // Esta linha pode dar problemas se o script estiver no mesmo objeto
-        // que os pain�is. Se o menu desaparecer, remove a linha abaixo.
+        // que os painéis. Se o menu desaparecer, remove a linha abaixo.
         // gameObject.SetActive(false); 
 
         SceneManager.LoadScene(_sceneIndex);
@@ -150,7 +227,7 @@ public class RoomList : MonoBehaviourPunCallbacks
     }
 
 
-    // Esta fun��o � para o "Back" do Lobby -> Menu Principal
+    // Esta função é para o "Back" do Lobby -> Menu Principal
     public void GoBackToMainMenu()
     {
         if (PhotonNetwork.IsConnected)
@@ -159,25 +236,18 @@ public class RoomList : MonoBehaviourPunCallbacks
         }
         SceneManager.LoadScene("MainMenu"); // Continua correta
     }
+    
+    // FUNÇÕES DE CONTROLE DE PAINEL
 
-    //
-    // !!! NOVAS FUN��ES ADICIONADAS !!!
-    //
-
-    /**
-     * Esta fun��o � para o bot�o "Create a room" (no LobbyPanel).
-     * Esconde o Lobby e mostra o painel de cria��o de sala.
-     */
     public void ShowCreateRoomPanel()
     {
         if (lobbyPanel != null) lobbyPanel.SetActive(false);
         if (createRoomPanel != null) createRoomPanel.SetActive(true);
+
+        // Garante que o estado dos botões é verificado quando o painel é mostrado.
+        UpdateCreateRoomButtonsState();
     }
 
-    /**
-     * Esta fun��o � para o bot�o "Back" (no CreateRoomPanel).
-     * Esconde o painel de cria��o e volta a mostrar o Lobby.
-     */
     public void GoBackToLobbyPanel()
     {
         if (createRoomPanel != null) createRoomPanel.SetActive(false);
