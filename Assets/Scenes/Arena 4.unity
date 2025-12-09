@@ -1313,7 +1313,7 @@ MonoBehaviour:
   roomCam: {fileID: 1386885288}
   nameUI: {fileID: 340567478}
   connectigUI: {fileID: 316747551}
-  endScreen: {fileID: 0}
+  endScreen: {fileID: 2051400753}
   mapName: Arena 4
 --- !u!4 &571687582
 Transform:
@@ -7850,6 +7850,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 322ff1e765e1ee341b7f7fb32d6a5053, type: 3}
+--- !u!114 &2051400753 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 4712781729296123462, guid: 322ff1e765e1ee341b7f7fb32d6a5053, type: 3}
+  m_PrefabInstance: {fileID: 2051400752}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 50f7ed87d5bb82a458b0144ff119a56c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1 &2056566958
 GameObject:
   m_ObjectHideFlags: 0
