@@ -78,9 +78,17 @@ public class LobbyManager : MonoBehaviourPunCallbacks
             return;
         }
 
+        // --- INÍCIO DA MUDANÇA ---
+        // Desativa a tela de Name Screen (nameUI) quando o Lobby Panel é ativado.
+        if (RoomManager.instance != null && RoomManager.instance.nameUI != null)
+        {
+            RoomManager.instance.nameUI.SetActive(false);
+        }
+        // --- FIM DA MUDANÇA ---
+
         lobbyPanel.SetActive(true);
         
-        // ⭐ ATIVAÇÃO DO CHAT: Liga o chat assim que o jogador entra na sala.
+        // Ativação do Chat
         ToggleChatVisibility(true); 
 
         if (PhotonNetwork.IsMasterClient) CheckStartConditions();
@@ -214,7 +222,7 @@ public class LobbyManager : MonoBehaviourPunCallbacks
 
         if (lobbyPanel != null) lobbyPanel.SetActive(false);
         
-        // ⭐ DESATIVAÇÃO DO CHAT: Desliga o chat porque o lobby está a fechar e o jogo está a começar.
+        // Desativação do Chat
         ToggleChatVisibility(false); 
 
         // === INICIA O JOGO NO ROOM MANAGER ===
