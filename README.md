@@ -2,8 +2,8 @@
 
 Esta documentação aborda os conceitos de Inteligência Artificial (IA) e Pathfinding implementados no sistema de inimigos e nos power-ups do projeto, em concordância com os tópicos do Projeto Aplicado.
 Este Projeto foi desonvolvido por :
-Bento Simões - 27914
-Hugo Oliveira - 27920
+Bento Simões - 27914,
+Hugo Oliveira - 27920,
 Ricardo Costa - 27927
 
 ## 1. Máquina de Estados Finitos (FSM)
