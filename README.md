@@ -123,19 +123,6 @@ Para garantir estabilidade e fluidez, foram tomadas várias medidas:
 
 ---
 
-## 5. Melhorias Futuras Possíveis
-
-Há várias direções de evolução natural:
-
-- Implementação de Behaviour Trees para comportamentos mais complexos.  
-- Substituição do BFS por A* em mapas maiores.  
-- Sistema de perceção auditiva.  
-- Coordenação entre inimigos.  
-- Smart Power-Ups adaptativos baseados no estilo de jogo do utilizador.  
-- Inimigos com memória curta (última posição vista do jogador).
-
----
-
 ## Conclusão
 
 A IA de *ClashBound* demonstra uma implementação sólida dos pilares fundamentais da Inteligência Artificial em jogos:
