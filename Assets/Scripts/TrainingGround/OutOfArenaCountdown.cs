@@ -38,16 +38,29 @@ public class OutOfArenaCountdown : MonoBehaviour
 
         if (countdownText != null)
             countdownText.gameObject.SetActive(false);
+
+        // --- CORREÇÃO AQUI ---
+        // Pedimos os limites APENAS UMA VEZ quando nascemos
+        if (SceneCameraConfig.instance != null)
+        {
+            SceneCameraConfig.instance.ConfigureNewPlayer(this);
+            // Opcional: Forçamos o hasBeenInsideOnce a true se confiarmos no spawn point
+            // mas deixar false é mais seguro para evitar mortes instantâneas por lag
+        }
+        else
+        {
+            if (debugLogs) Debug.LogWarning("[OutOfArena] SceneCameraConfig não encontrado!");
+        }
     }
 
     void Update()
     {
-        if (health == null)
-            return;
+        if (health == null) return;
 
         // só o dono do player trata disto
-        if (view != null && !view.IsMine)
-            return;
+        if (view != null && !view.IsMine) return;
+
+        // --- REMOVI A PARTE DO CONFIG DAQUI --- 
 
         Vector3 pos = transform.position;
 
@@ -56,7 +69,6 @@ public class OutOfArenaCountdown : MonoBehaviour
             pos.y >= minBounds.y && pos.y <= maxBounds.y;
 
         // PRIMEIRO: garantir que ele já esteve dentro uma vez
-        // para não matar logo ao spawn se os bounds estiverem mal
         if (!hasBeenInsideOnce)
         {
             if (inside)
@@ -64,8 +76,6 @@ public class OutOfArenaCountdown : MonoBehaviour
                 hasBeenInsideOnce = true;
                 if (debugLogs) Debug.Log("[OutOfArena] Player entrou na arena pela primeira vez.");
             }
-
-            // enquanto não tiver estado dentro, não faz mais nada
             return;
         }
 
@@ -116,8 +126,7 @@ public class OutOfArenaCountdown : MonoBehaviour
         if (countdownText != null)
             countdownText.gameObject.SetActive(false);
 
-        if (health == null)
-            return;
+        if (health == null) return;
 
         if (debugLogs) Debug.Log("[OutOfArena] Tempo acabou, matar player.");
 
@@ -126,7 +135,6 @@ public class OutOfArenaCountdown : MonoBehaviour
         PhotonView hView = health.GetComponent<PhotonView>();
         if (hView != null)
         {
-            // -1 = sem atacante (não conta como kill de ninguém)
             hView.RPC(nameof(Health.TakeDamage), RpcTarget.All, damage, -1);
         }
         else

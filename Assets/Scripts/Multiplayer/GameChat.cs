@@ -2,19 +2,11 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using Photon.Pun;
-using ExitGames.Client.Photon; // Necessário para a extensão .IsNullOrEmpty()
-using System.Collections;
-using System;
-
-// Adiciona isto se estiveres a usar a extensão IsNullOrEmpty() para strings da Photon.
-// Se não funcionar, usa 'string.IsNullOrEmpty(InputField.text)'
-// Nota: O código original usava WebSocketSharp.IsNullOrEmpty, que pode não estar disponível.
-// Vamos garantir que a verificação de texto vazio é segura.
+using UnityEngine.EventSystems;
 
 public class GameChat : MonoBehaviourPunCallbacks
 {
     // 1. SINGLETON
-    // Usar a instância singleton para acesso fácil de outras classes, como o Player.
     public static GameChat instance;
 
     [Header("Referências")]
@@ -23,107 +15,126 @@ public class GameChat : MonoBehaviourPunCallbacks
     [Tooltip("O campo onde o jogador digita a mensagem.")]
     public TMP_InputField InputField;
 
-    // 2. PROPRIEDADE PÚBLICA
-    private bool isInputFiieldToggled;
-    public bool IsChatOpen => isInputFiieldToggled; 
+    // 2. ESTADO DO CHAT
+    private bool isInputFieldToggled;
+    public bool IsChatOpen => isInputFieldToggled; 
     
-    // A referência ao PhotonView é necessária para enviar e receber RPCs.
     private PhotonView pv;
 
     void Awake()
     {
-        // Garante que só há uma instância.
-        if (instance != null && instance != this)
+        // Configuração do Singleton
+        if (instance == null)
         {
-            // Este caso só deve ocorrer se houver problemas de cena/DontDestroyOnLoad,
-            // o que já corrigimos ao transformá-lo num objeto de cena.
-            Destroy(this.gameObject);
+            instance = this;
+        }
+        else if (instance != this)
+        {
+            Destroy(gameObject);
             return;
         }
-        instance = this;
         
-        // Garante que o PhotonView é capturado para uso posterior.
         pv = GetComponent<PhotonView>();
 
-        // Desativa a entrada de texto no início
+        // Garante que o chat começa fechado e limpo
         if (InputField != null)
         {
-            InputField.gameObject.SetActive(true); // O input field em si deve estar ativo, mas não selecionado
+            InputField.text = "";
             InputField.DeactivateInputField();
         }
     }
 
+    /// Quando o LobbyManager desativa este objeto para começar a partida,
+    void OnDisable()
+    {
+        isInputFieldToggled = false;
+
+        // Devolve o foco ao jogo (tira o cursor do campo de texto)
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.SetSelectedGameObject(null);
+        }
+
+        if (InputField != null)
+        {
+            InputField.DeactivateInputField();
+        }
+        
+        Debug.Log("GameChat: Script desativado. Estado resetado para a partida.");
+    }
+
     void Update()
     {
-        // Alternar (Toggle) a abertura do Chat com a tecla Y
+        // Atalho para abrir o chat (Tecla Y)
         if (Input.GetKeyDown(KeyCode.Y))
         {
-            if (!isInputFiieldToggled)
+            if (!isInputFieldToggled)
             {
-                // Abrir Chat
-                isInputFiieldToggled = true;
-                InputField.Select();
-                InputField.ActivateInputField();
-                Debug.Log("InputField ativado");
+                OpenChat();
             }
-            else // Se o chat já estiver aberto, Y pode fechar (mas o Escape é prioritário)
+            else
             {
                 CloseChat();
             }
         }
 
-        // 3. PRIORIDADE ESCAPE: Fecha sempre o chat
-        if(Input.GetKeyDown(KeyCode.Escape) && isInputFiieldToggled)
+        // Tecla ESC para cancelar a escrita
+        if (Input.GetKeyDown(KeyCode.Escape) && isInputFieldToggled)
         {
             CloseChat(); 
             return; 
         }
 
-        // Enviar mensagem quando Return/Enter é pressionado
-        if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) && isInputFiieldToggled)
+        // Enviar mensagem (Tecla Enter)
+        if ((Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.KeypadEnter)) && isInputFieldToggled)
         {
-            // Usa a verificação de string padrão do C#
             if (!string.IsNullOrEmpty(InputField.text))
             {
-                // Envia a mensagem via RPC para todos os clientes
                 string messagetoSend = $"{PhotonNetwork.LocalPlayer.NickName}: {InputField.text}";
                 
-                // Usamos a referência pv capturada no Awake
                 if(pv != null)
                 {
                     pv.RPC("SendChatMessage", RpcTarget.All, messagetoSend);
                 }
 
-                InputField.text = ""; // Limpa o campo de entrada
-                CloseChat();          // Fecha o chat após enviar
-                Debug.Log("Mensagem enviada");
+                InputField.text = ""; 
+                CloseChat();
             }
             else
             {
-                // Fecha o chat se o jogador pressionar Enter com o campo vazio
                 CloseChat();
             }
         }
     }
 
-    public void CloseChat()
+    public void OpenChat()
     {
-        isInputFiieldToggled = false;
-        
-        // Limpa a seleção do InputField e desativa-o
-        if (UnityEngine.EventSystems.EventSystem.current != null)
-        {
-             UnityEngine.EventSystems.EventSystem.current.SetSelectedGameObject(null);
-        }
-        InputField.DeactivateInputField();
-        Debug.Log("InputField desativado");
+        isInputFieldToggled = true;
+        InputField.ActivateInputField();
+        InputField.Select(); // Garante que o teclado foca no texto imediatamente
+        Debug.Log("Chat Aberto");
     }
 
-    // PunRPC: Este método será chamado na PhotonView em todos os clientes (RpcTarget.All)
+    public void CloseChat()
+    {
+        isInputFieldToggled = false;
+        
+        if (EventSystem.current != null)
+        {
+            EventSystem.current.SetSelectedGameObject(null);
+        }
+        
+        InputField.DeactivateInputField();
+        Debug.Log("Chat Fechado");
+    }
+
+    // RPC para sincronizar as mensagens entre todos os jogadores
     [PunRPC]
     void SendChatMessage(string _message)
     {
-        // Adiciona a nova mensagem ao chatText, seguida de uma nova linha
-        chatText.text = chatText.text + "\n" + _message;
+        if (chatText != null)
+        {
+            chatText.text += "\n" + _message;
+        }
     }
 }

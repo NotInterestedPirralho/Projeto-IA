@@ -147,18 +147,20 @@ public class PlayerSetup : MonoBehaviourPunCallbacks, IPunObservable
         currentNickname = _nickname;
         if (nicknameText != null) 
         {
-            nicknameText.text = currentNickname;
+            //nicknameText.text = currentNickname;
             
             // Verifica se este objeto de jogador pertence ao cliente local (EU)
             if (photonView.IsMine)
             {
                 // JOGADOR LOCAL: Cor Verde
-                nicknameText.color = Color.green; 
+                nicknameText.color = Color.green;
+                nicknameText.text = ""; // Esconde o nome do próprio jogador
             }
             else
             {
                 // JOGADOR REMOTO (Oponente): Cor Vermelha
                 nicknameText.color = Color.red;
+                nicknameText.text = currentNickname;
             }
         }
     }

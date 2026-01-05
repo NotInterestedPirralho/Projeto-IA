@@ -16,8 +16,8 @@ public class RoomList : MonoBehaviourPunCallbacks
     public GameObject roomListItemPrefab;
 
     [Header("UI (Paineis)")]
-    public GameObject lobbyPanel; 
-    public GameObject createRoomPanel; 
+    public GameObject lobbyPanel;
+    public GameObject createRoomPanel;
 
     // --- NOVAS REFERENCIAS ---
     [Header("UI (Criacao de Sala)")]
@@ -40,15 +40,15 @@ public class RoomList : MonoBehaviourPunCallbacks
             // Se a referência faltar, tratamos o nome como vazio
             cachedRoomNameToCreate = "";
         }
-        
+
         // 2. DEBUG: Mostra o nome capturado e o seu comprimento
         Debug.Log("--- INPUT EVENT (ChangeRoomToCreateName) ---");
         Debug.Log("Nome Capturado: [" + cachedRoomNameToCreate + "]. Comprimento: " + cachedRoomNameToCreate.Length);
-        
+
         // 3. Verifica se o nome é válido e ativa/desativa os botões
         UpdateCreateRoomButtonsState();
     }
-    
+
     public void OnRoomNameEndEdit(string _roomName)
     {
         // Garante que o nome armazenado esta atualizado, lendo diretamente do campo
@@ -60,8 +60,8 @@ public class RoomList : MonoBehaviourPunCallbacks
         {
             cachedRoomNameToCreate = _roomName.Trim(); // Fallback
         }
-        
-        UpdateCreateRoomButtonsState(); 
+
+        UpdateCreateRoomButtonsState();
 
         bool isValidName = !string.IsNullOrEmpty(cachedRoomNameToCreate);
 
@@ -69,7 +69,7 @@ public class RoomList : MonoBehaviourPunCallbacks
         if (isValidName && createRoomButtons != null && createRoomButtons.Length > 0)
         {
             Debug.Log("ENTER PRESSIONADO. Nome válido. Tentando criar sala na Arena 1 (Índice 1).");
-            CreateRoomByIndex(1); 
+            CreateRoomByIndex(1);
         }
     }
 
@@ -106,6 +106,9 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     public void CreateRoomByIndex(int sceneIndex)
     {
+        // --- ADICIONADO: SOM DE CLIQUE ---
+        AudioManager.PlayClick();
+
         // Esta função está perfeita para os teus botões "Create Room in Arena 1/2"
         JoinRoomByName(cachedRoomNameToCreate, sceneIndex);
     }
@@ -230,17 +233,23 @@ public class RoomList : MonoBehaviourPunCallbacks
     // Esta função é para o "Back" do Lobby -> Menu Principal
     public void GoBackToMainMenu()
     {
+        // --- ADICIONADO: SOM DE CLIQUE ---
+        AudioManager.PlayClick();
+
         if (PhotonNetwork.IsConnected)
         {
             PhotonNetwork.Disconnect();
         }
         SceneManager.LoadScene("MainMenu"); // Continua correta
     }
-    
+
     // FUNÇÕES DE CONTROLE DE PAINEL
 
     public void ShowCreateRoomPanel()
     {
+        // --- ADICIONADO: SOM DE CLIQUE ---
+        AudioManager.PlayClick();
+
         if (lobbyPanel != null) lobbyPanel.SetActive(false);
         if (createRoomPanel != null) createRoomPanel.SetActive(true);
 
@@ -250,6 +259,9 @@ public class RoomList : MonoBehaviourPunCallbacks
 
     public void GoBackToLobbyPanel()
     {
+        // --- ADICIONADO: SOM DE CLIQUE ---
+        AudioManager.PlayClick();
+
         if (createRoomPanel != null) createRoomPanel.SetActive(false);
         if (lobbyPanel != null) lobbyPanel.SetActive(true);
     }

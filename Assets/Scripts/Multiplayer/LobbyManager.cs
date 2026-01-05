@@ -262,6 +262,15 @@ public class LobbyManager : MonoBehaviourPunCallbacks
     {
         if (gameChatObject != null)
         {
+            if (!isVisible)
+            {
+                GameChat chatScript = gameChatObject.GetComponent<GameChat>();
+                if (chatScript != null)
+                {
+                    chatScript.CloseChat();
+                }
+            }
+
             gameChatObject.SetActive(isVisible);
         }
     }

@@ -201,3 +201,6 @@ MonoBehaviour:
   type: 0
   amount: 30
   duration: 5
+  damageMultiplier: 2
+  damageDuration: 10
+  healthThreshold: 0.3

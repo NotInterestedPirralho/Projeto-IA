@@ -15,13 +15,6 @@ public class PMMM : MonoBehaviour
     public GameObject pausePanel;
 
     private bool isGameSceneLoaded = false;
-    
-    // VARIÁVEL FICTÍCIA (para evitar dependência direta sem fornecer LobbyManager)
-    public class LobbyManager
-    {
-        public static LobbyManager instance;
-        public static bool GameStartedAndPlayerCanMove = true; 
-    }
 
     void Awake()
     {
@@ -32,6 +25,7 @@ public class PMMM : MonoBehaviour
         }
         instance = this;
         DontDestroyOnLoad(this.gameObject);
+        
         IsPausedLocally = false;
         if (pausePanel != null) pausePanel.SetActive(false);
     }
@@ -48,6 +42,7 @@ public class PMMM : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // Verifica se não estamos no Menu Principal
         isGameSceneLoaded = !scene.name.Contains("Menu"); 
 
         if (pausePanel != null) pausePanel.SetActive(false);
@@ -64,20 +59,20 @@ public class PMMM : MonoBehaviour
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             // 1. PRIORIDADE DO CHAT
-            GameChat chatInstance = GameChat.instance;
-            if (chatInstance != null && chatInstance.IsChatOpen) 
+            if (GameChat.instance != null && GameChat.instance.IsChatOpen) 
             {
                 return; 
             }
 
-            // 2. PRIORIDADE DO LOBBY (Usando a classe fictícia ou a real, se importada)
+            // 2. PRIORIDADE DO LOBBY
+            // Impede abrir o menu de pausa se o jogador ainda estiver na tela de Lobby
             bool lobbyBlocking = (LobbyManager.instance != null && !LobbyManager.GameStartedAndPlayerCanMove);
             if (lobbyBlocking)
             {
                 return;
             }
 
-            // 3. Pausar/Retomar
+            // 3. Alternar Pausa
             if (IsPausedLocally)
             {
                 ResumeGame();
@@ -95,8 +90,9 @@ public class PMMM : MonoBehaviour
 
         IsPausedLocally = true;
         if (pausePanel != null) pausePanel.SetActive(true);
+        
         UnlockCursor();
-        Debug.Log("[PMMM] Jogo pausado localmente. Inputs bloqueados.");
+        Debug.Log("[PMMM] Jogo pausado. Movimento bloqueado via IsPausedLocally.");
     }
 
     public void ResumeGame()
@@ -106,7 +102,6 @@ public class PMMM : MonoBehaviour
         IsPausedLocally = false;
         if (pausePanel != null) pausePanel.SetActive(false);
         LockCursor();
-        Debug.Log("[PMMM] Jogo retomado. Inputs reativados.");
     }
 
     public void LeaveGame()
@@ -114,14 +109,12 @@ public class PMMM : MonoBehaviour
         IsPausedLocally = false;
         UnlockCursor();
         
-        // CHAMA O ROOM MANAGER PARA SAIR DO JOGO
         if (RoomManager.instance != null)
         {
             RoomManager.instance.LeaveGameAndGoToMenu("MenuPrincipal"); 
         }
         else
         {
-            // Fallback
             if (PhotonNetwork.InRoom) PhotonNetwork.LeaveRoom();
             SceneManager.LoadScene("MenuPrincipal"); 
         }
@@ -131,7 +124,8 @@ public class PMMM : MonoBehaviour
     
     public void LockCursor()
     {
-        Cursor.lockState = CursorLockMode.Confined; 
+        // Ajusta conforme a necessidade do teu jogo 2D
+        Cursor.lockState = CursorLockMode.None; 
         Cursor.visible = true;
     }
 

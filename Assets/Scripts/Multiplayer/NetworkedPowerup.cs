@@ -4,61 +4,85 @@ using Photon.Pun;
 [RequireComponent(typeof(PhotonView))]
 public class NetworkedPowerup : MonoBehaviourPun
 {
-    public enum PowerupType { Health, Speed }
+    // Adicionamos o "Smart" à lista de tipos que já tinhas
+    public enum PowerupType { Health, Speed, Smart }
 
-    [Header("Configuração")]
+    [Header("Tipo de Powerup")]
     public PowerupType type;
-    public float amount = 30f;
-    public float duration = 5f;
+
+    [Header("Configuração Geral")]
+    public float amount = 30f;   // Valor da cura (para modo Health)
+    public float duration = 5f;  // Duração (para Speed)
+
+    [Header("Configuração Smart (Só usado se Type for Smart)")]
+    [Tooltip("Dobra o dano se a vida estiver cheia")]
+    public float damageMultiplier = 2.0f;
+    public float damageDuration = 10f;
+    [Tooltip("Abaixo desta percentagem (0.3 = 30%), cura tudo.")]
+    [Range(0f, 1f)] public float healthThreshold = 0.3f;
 
     private bool isCollected = false;
 
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        // 1. Evita coleta dupla
         if (isCollected) return;
 
-        // 2. Verifica se é um jogador
         if (collision.CompareTag("Player"))
         {
             PhotonView targetView = collision.GetComponent<PhotonView>();
+            Health playerHealth = collision.GetComponent<Health>();
 
-            if (targetView != null)
+            // Verifica se é o jogador local
+            if (targetView != null && targetView.IsMine)
             {
-                isCollected = true; // Marca como apanhado para não disparar 2 vezes
+                isCollected = true;
 
-                // --- APLICAR EFEITO ---
+                // --- 1. LÓGICA ANTIGA (MANTIDA) ---
                 if (type == PowerupType.Health)
                 {
                     targetView.RPC("Heal", RpcTarget.All, (int)amount);
+                    Debug.Log("Powerup: Cura Fixa Aplicada.");
                 }
                 else if (type == PowerupType.Speed)
                 {
-                    targetView.RPC("BoostSpeed", RpcTarget.All, amount, duration);
+                    // Usa o valor 'amount' como multiplicador de velocidade
+                    targetView.RPC("BoostSpeed", RpcTarget.All, amount, duration); // OU "ActivateSpeedJumpBuff" se preferires o novo
+                    Debug.Log("Powerup: Velocidade Fixa Aplicada.");
+                }
+                // --- 2. LÓGICA NOVA (SMART) ---
+                else if (type == PowerupType.Smart && playerHealth != null)
+                {
+                    float hpPercent = (float)playerHealth.health / playerHealth.maxHealth;
+
+                    if (hpPercent <= healthThreshold)
+                    {
+                        // Vida Baixa -> Cura Total (999 para encher tudo)
+                        targetView.RPC("Heal", RpcTarget.All, 999);
+                        Debug.Log("Smart Powerup: Cura Total (Vida Crítica!)");
+                    }
+                    else
+                    {
+                        // Vida Alta -> Dano Extra
+                        targetView.RPC("BoostDamage", RpcTarget.All, damageMultiplier, damageDuration);
+                        Debug.Log("Smart Powerup: Dano Extra (Modo Ataque!)");
+                    }
                 }
 
-                
-
-                // Se eu sou o DONO DA SALA (Master Client), tenho permissão para destruir.
+                // --- DESTRUIÇÃO (IGUAL AO QUE TINHAS) ---
                 if (PhotonNetwork.IsMasterClient)
                 {
-
                     PhotonNetwork.Destroy(gameObject);
                 }
                 else
                 {
-                    // Passo A: Escondo o objeto visualmente PARA MIM (para parecer instantâneo)
                     GetComponent<Renderer>().enabled = false;
                     GetComponent<Collider2D>().enabled = false;
-
-                    // Passo B: Peço ao Master Client (por favor) para destruir o objeto
                     photonView.RPC("DestroyMe", RpcTarget.MasterClient);
                 }
             }
         }
     }
 
-    // Esta função só corre no computador do Master Client
     [PunRPC]
     public void DestroyMe()
     {

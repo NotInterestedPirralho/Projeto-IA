@@ -168,7 +168,7 @@ BoxCollider2D:
     drawMode: 0
     adaptiveTiling: 0
   m_AutoTiling: 0
-  m_Size: {x: 0.18952695, y: 0.1513567}
+  m_Size: {x: 0.22, y: 0.17}
   m_EdgeRadius: 0
 --- !u!114 &245647368185658279
 MonoBehaviour:
@@ -261,12 +261,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   currentState: 0
-  chaseRange: 8
-  attackRange: 2.5
-  moveSpeed: 3
-  patrolSpeed: 1.5
-  patrolDistance: 5
-  edgeCheckDistance: 5
+  chaseRange: 6
+  attackRange: 2
+  moveSpeed: 2
+  patrolSpeed: 1
+  patrolDistance: 2
+  edgeCheckDistance: 0.5
   wallCheckDistancePatrol: 0.5
   groundCheckPoint: {fileID: 2370973604299485676}
   groundLayer:
@@ -280,7 +280,7 @@ MonoBehaviour:
   stunTime: 0.5
   attackDamage: 7
   attackCooldown: 1.5
-  attackOffsetDistance: 0.5
+  attackOffsetDistance: 0.1
   attackPoint: {fileID: 1155275024724574856}
   playerLayer:
     serializedVersion: 2
@@ -355,7 +355,7 @@ Transform:
   m_GameObject: {fileID: 3628230557614382467}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.123, y: 0, z: 0}
+  m_LocalPosition: {x: 0.09, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

@@ -1,10 +1,15 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class SCM : MonoBehaviour
 {
-    // Mantemos a estática para acesso rápido, mas o importante agora é o PlayerPrefs
+    // Mantemos a estática para acesso rápido
     public static string selectedCharacter = "None";
+
+    [Header("Feedback Visual")]
+    // Arraste os 4 botões (Soldier, Skeleton, Knight, Orc) por ordem para aqui
+    public UISelectionHandler[] allCharacterButtons;
 
     public enum CharacterType
     {
@@ -20,37 +25,51 @@ public class SCM : MonoBehaviour
     {
         selectedCharacter = characterName;
 
-        // --- A CORREÇÃO MÁGICA ---
-        // Guarda a escolha na memória permanente do jogo.
-        // Assim, quando mudas de cena, o RoomManager consegue ler isto!
+        // Guarda a escolha na memória permanente do jogo
         PlayerPrefs.SetString("SelectedCharacter", characterName);
 
         Debug.Log("Personagem selecionado e salvo: " + selectedCharacter);
+
+        // --- ADICIONADO: Atualiza a marcação visual ---
+        UpdateVisualSelection(characterName);
     }
 
-    // Método chamado pelos botões (Enum - Opcional se usares o de cima)
+    // Método para gerir as cores dos botões
+    private void UpdateVisualSelection(string charName)
+    {
+        if (allCharacterButtons == null || allCharacterButtons.Length == 0) return;
+
+        for (int i = 0; i < allCharacterButtons.Length; i++)
+        {
+            if (allCharacterButtons[i] == null) continue;
+
+            bool isSelected = false;
+            // Compara a string guardada com o personagem correspondente ao botão
+            if (i == 0 && charName == "Soldier") isSelected = true;
+            else if (i == 1 && charName == "Skeleton") isSelected = true;
+            else if (i == 2 && charName == "Knight") isSelected = true;
+            else if (i == 3 && charName == "Orc") isSelected = true;
+
+            allCharacterButtons[i].SetSelected(isSelected);
+        }
+    }
+
+    // Método chamado pelos botões (Enum - Opcional)
     public void SelectCharacter(CharacterType character)
     {
         string charName = character.ToString();
-
-        if (character == CharacterType.None)
-            charName = "None";
-
-        // Chama a função principal para salvar
+        if (character == CharacterType.None) charName = "None";
         SelectCharacter(charName);
     }
 
     public void GoToLobby()
     {
-        // Verifica se escolheu algum personagem válido
         if (selectedCharacter == "None" || string.IsNullOrEmpty(selectedCharacter))
         {
             Debug.LogError("Por favor, selecione um personagem antes de clicar em Play.");
             return;
         }
 
-        // Carrega a cena do Lobby
-        // Certifica-te que o nome da cena aqui é EXATAMENTE igual ao da tua cena de Lobby
         SceneManager.LoadScene("MultiplayerLobby");
     }
 }

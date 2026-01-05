@@ -3,9 +3,7 @@ using System.Collections;
 using Photon.Pun;
 using ExitGames.Client.Photon;
 
-// Garante que o objeto inimigo tem estes componentes
 [RequireComponent(typeof(Rigidbody2D), typeof(PhotonView))]
-// MUDANÇA 1: Herda de EnemyBase para funcionar com o EnemyHealth
 public class EnemyAI : EnemyBase 
 {
     // --- 1. DEFINIÇÃO DE ESTADOS ---
@@ -19,7 +17,6 @@ public class EnemyAI : EnemyBase
     }
 
     // --- 2. VARIÁVEIS DE CONFIGURAÇÃO ---
-
     [Header("Geral")]
     public AIState currentState;
     public float chaseRange = 8f;
@@ -29,7 +26,7 @@ public class EnemyAI : EnemyBase
     [Header("Patrulha")]
     public float patrolSpeed = 1.5f;
     public float patrolDistance = 5f;
-    public float edgeCheckDistance = 5f;
+    public float edgeCheckDistance = 1f;
     public float wallCheckDistancePatrol = 0.5f;
     public Transform groundCheckPoint;
     public LayerMask groundLayer;
@@ -48,14 +45,12 @@ public class EnemyAI : EnemyBase
     public float attackOffsetDistance = 0.5f;
 
     public Transform attackPoint;
-    public LayerMask playerLayer; // Layer Mask para o OverlapCircle (onde procura)
+    public LayerMask playerLayer;
 
-    // MUDANÇA 2: Adicionado 'override' para cumprir o contrato do EnemyBase
     public override float KnockbackForce => knockbackForce;
     public override float StunTime => stunTime;
 
     // --- 3. VARIÁVEIS PRIVADAS ---
-
     private Transform playerTarget;
     private Rigidbody2D rb;
     private float nextAttackTime = 0f;
@@ -66,7 +61,6 @@ public class EnemyAI : EnemyBase
     private SpriteRenderer spriteRenderer;
 
     // --- 4. FUNÇÕES BASE ---
-
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -80,19 +74,12 @@ public class EnemyAI : EnemyBase
         {
             currentState = AIState.Patrol;
             patrolOrigin = transform.position;
-
-            // Tenta encontrar o player (Atenção: isto só deve ser feito uma vez)
-            GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-            if (players.Length > 0)
-            {
-                playerTarget = players[0].transform;
-            }
+            FindTarget();
         }
     }
 
     void Update()
     {
-        // Apenas o Master Client controla a IA
         if (!PhotonNetwork.IsMasterClient) return;
 
         isGrounded = CheckGrounded();
@@ -111,52 +98,70 @@ public class EnemyAI : EnemyBase
             case AIState.Stunned:
                 HandleStunned();
                 break;
-            default:
-                // Usa rb.velocity se não estiveres no Unity 6 (rb.linearVelocity)
-                rb.linearVelocity = Vector2.zero; 
-                break;
         }
+
+        ApplyArenaLimits(); 
     }
 
     // --- 5. LÓGICA DE ESTADOS ---
 
     void HandlePatrol()
     {
+        // Movimento lateral
         rb.linearVelocity = new Vector2(patrolSpeed * direction, rb.linearVelocity.y);
 
-        Vector3 checkPos = groundCheckPoint.position;
+        // Verificações de ambiente
         Vector2 checkDir = new Vector2(direction, 0);
-
-        RaycastHit2D edgeHit = Physics2D.Raycast(checkPos + new Vector3(direction * wallCheckDistancePatrol, 0, 0), Vector2.down, edgeCheckDistance, groundLayer);
+        RaycastHit2D edgeHit = Physics2D.Raycast(groundCheckPoint.position, Vector2.down, edgeCheckDistance, groundLayer);
         RaycastHit2D wallHit = Physics2D.Raycast(transform.position, checkDir, wallCheckDistancePatrol, groundLayer);
 
-        if (edgeHit.collider == null || wallHit.collider != null)
+        // Verificação de limites de Arena
+        bool hitArenaLimit = false;
+        if (EnemyArenaConfig.instance != null)
         {
-            direction *= -1;
+            if (direction == 1 && transform.position.x >= EnemyArenaConfig.instance.maxX - 0.5f) hitArenaLimit = true;
+            if (direction == -1 && transform.position.x <= EnemyArenaConfig.instance.minX + 0.5f) hitArenaLimit = true;
         }
-        else
+
+        // Verificação de distância máxima da patrulha
+        float distanceToOrigin = Mathf.Abs(transform.position.x - patrolOrigin.x);
+        bool reachedMaxPatrol = distanceToOrigin >= patrolDistance;
+
+        // Inverter direção se: Bater parede, chegar ao fim do chão, limite da arena ou fim do raio de patrulha
+        if (edgeHit.collider == null || wallHit.collider != null || hitArenaLimit || reachedMaxPatrol)
         {
-            float distanceToOrigin = Mathf.Abs(transform.position.x - patrolOrigin.x);
-            if (distanceToOrigin >= patrolDistance)
+            // Se foi por distância, garante que vira para o lado correto (centro)
+            if (reachedMaxPatrol)
             {
-                if (transform.position.x > patrolOrigin.x && direction == 1) direction = -1;
-                else if (transform.position.x < patrolOrigin.x && direction == -1) direction = 1;
+                direction = (transform.position.x > patrolOrigin.x) ? -1 : 1;
+            }
+            else
+            {
+                direction *= -1;
             }
         }
 
         FlipSprite(direction);
 
+        // Se ver o player, persegue
         if (CanSeePlayer()) currentState = AIState.Chase;
     }
 
     void HandleChase()
     {
-        if (playerTarget == null) return;
+        if (playerTarget == null) { currentState = AIState.Patrol; return; }
 
-        Vector2 targetPos = playerTarget.position;
-        Vector2 selfPos = transform.position;
-        float distance = Vector2.Distance(selfPos, targetPos);
-        float directionX = (targetPos.x > selfPos.x) ? 1 : -1;
+        float distance = Vector2.Distance(transform.position, playerTarget.position);
+        float directionX = (playerTarget.position.x > transform.position.x) ? 1 : -1;
+
+        // Se perder o player (distância ou visão), volta a patrulhar
+        if (distance > chaseRange * 1.2f || !CanSeePlayer())
+        {
+            currentState = AIState.Patrol;
+            // Opcional: define a nova origem de patrulha para onde ele está agora
+            patrolOrigin = transform.position; 
+            return;
+        }
 
         FlipSprite(directionX);
 
@@ -165,22 +170,17 @@ public class EnemyAI : EnemyBase
             currentState = AIState.Attack;
             return;
         }
-        else if (distance > chaseRange * 1.5f || !CanSeePlayer())
-        {
-            currentState = AIState.Patrol;
-            return;
-        }
 
         rb.linearVelocity = new Vector2(directionX * moveSpeed, rb.linearVelocity.y);
 
-        // Lógica de salto simplificada
-        RaycastHit2D wallHit = Physics2D.Raycast(selfPos, new Vector2(directionX, 0), wallCheckDistanceChase, groundLayer);
+        // Lógica de salto
+        RaycastHit2D wallHit = Physics2D.Raycast(transform.position, new Vector2(directionX, 0), wallCheckDistanceChase, groundLayer);
         if (wallHit.collider != null)
         {
-            RaycastHit2D heightHit = Physics2D.Raycast(selfPos + new Vector2(directionX * wallCheckDistanceChase, 0), Vector2.up, jumpHeightTolerance, groundLayer);
+            RaycastHit2D heightHit = Physics2D.Raycast(transform.position + new Vector3(directionX * wallCheckDistanceChase, 0), Vector2.up, jumpHeightTolerance, groundLayer);
             if (heightHit.collider == null) TryJump();
         }
-        else if (targetPos.y > selfPos.y + 0.5f && distance > minJumpDistance)
+        else if (playerTarget.position.y > transform.position.y + 0.5f && distance > minJumpDistance)
         {
             TryJump();
         }
@@ -188,12 +188,11 @@ public class EnemyAI : EnemyBase
 
     void HandleAttack()
     {
-        if (playerTarget == null) return;
+        if (playerTarget == null) { currentState = AIState.Patrol; return; }
 
         float directionX = (playerTarget.position.x > transform.position.x) ? 1 : -1;
         FlipSprite(directionX);
-
-        rb.linearVelocity = Vector2.zero;
+        rb.linearVelocity = new Vector2(0, rb.linearVelocity.y);
 
         if (Time.time >= nextAttackTime)
         {
@@ -203,7 +202,9 @@ public class EnemyAI : EnemyBase
         }
     }
 
-    void HandleStunned() { }
+    void HandleStunned() { /* RB controlado pelo AddForce no RPC */ }
+
+    // --- 6. MÉTODOS AUXILIARES ---
 
     private void FlipSprite(float currentDirection)
     {
@@ -213,44 +214,24 @@ public class EnemyAI : EnemyBase
         attackPoint.localPosition = new Vector3(newLocalX, attackPoint.localPosition.y, attackPoint.localPosition.z);
     }
 
-    // --- 6. FUNÇÕES DE COMBATE COM FILTRO DE TAG ---
-
     void DoAttack()
     {
-        if (attackPoint == null)
-        {
-            Debug.LogError("⛔ [ERRO CRÍTICO] O AttackPoint não está atribuído no Inspector do Inimigo!");
-            return;
-        }
-
         Collider2D[] hitPlayers = Physics2D.OverlapCircleAll(attackPoint.position, attackRange, playerLayer);
-
         foreach (Collider2D hit in hitPlayers)
         {
-            if (!hit.CompareTag("Player")) continue;
-
             PhotonView targetView = hit.GetComponentInParent<PhotonView>();
-            Health playerHealth = hit.GetComponentInParent<Health>();
             CombatSystem2D playerCombat = hit.GetComponentInParent<CombatSystem2D>();
 
-            if (targetView != null && playerHealth != null)
+            if (targetView != null)
             {
                 bool playerDefending = (playerCombat != null && playerCombat.isDefending);
                 int finalDamage = playerDefending ? attackDamage / 4 : attackDamage;
 
-                targetView.RPC(
-                    nameof(Health.TakeDamageComplete),
-                    RpcTarget.All,
-                    finalDamage,
-                    photonView.ViewID,
-                    knockbackForce,
-                    stunTime
-                );
+                targetView.RPC("TakeDamageComplete", RpcTarget.All, finalDamage, photonView.ViewID, knockbackForce, stunTime);
             }
         }
     }
 
-    // MUDANÇA 3: Adicionado 'override' para substituir o método abstrato do EnemyBase
     [PunRPC]
     public override void ApplyKnockbackRPC(Vector2 direction, float force, float time)
     {
@@ -261,29 +242,30 @@ public class EnemyAI : EnemyBase
         StartCoroutine(ResetStun(time));
     }
 
-    // --- 7. UTILS & COROUTINES ---
-
     bool CanSeePlayer()
     {
         if (playerTarget == null) return false;
         Vector2 selfPos = transform.position;
         Vector2 targetPos = playerTarget.position;
-        float distance = Vector2.Distance(selfPos, targetPos);
-        if (distance > chaseRange) return false;
+        if (Vector2.Distance(selfPos, targetPos) > chaseRange) return false;
+
         RaycastHit2D hit = Physics2D.Linecast(selfPos, targetPos, groundLayer);
         return hit.collider == null;
     }
 
-    bool CheckGrounded() => Physics2D.Raycast(transform.position, Vector2.down, 0.1f, groundLayer);
+    bool CheckGrounded() => Physics2D.Raycast(transform.position, Vector2.down, 0.2f, groundLayer);
 
-    void TryJump()
+    void TryJump() { if (isGrounded) rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce); }
+
+    void FindTarget()
     {
-        if (isGrounded) rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
+        GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
+        if (players.Length > 0) playerTarget = players[0].transform;
     }
 
-    IEnumerator ResetStun(float stunTime)
+    IEnumerator ResetStun(float time)
     {
-        yield return new WaitForSeconds(stunTime);
+        yield return new WaitForSeconds(time);
         if (currentState == AIState.Stunned) currentState = AIState.Chase;
     }
 
@@ -293,19 +275,40 @@ public class EnemyAI : EnemyBase
         if (currentState == AIState.Attack) currentState = newState;
     }
 
+    // --- DEBUG VISUAL ---
     void OnDrawGizmosSelected()
     {
+        // 1. Área de Ataque (Esfera Vermelha)
         if (attackPoint != null)
         {
-            Gizmos.color = Color.magenta;
+            Gizmos.color = Color.red;
             Gizmos.DrawWireSphere(attackPoint.position, attackRange);
         }
+
+        // 2. Raio de Visão/Perseguição (Esfera Amarela)
         Gizmos.color = Color.yellow;
         Gizmos.DrawWireSphere(transform.position, chaseRange);
-        if (playerTarget != null)
+
+        // 3. DISTÂNCIA DE PATRULHA (Linha Branca)
+        // Só desenha se estivermos no modo Play ou se já tivermos uma origem definida
+        Vector2 center = Application.isPlaying ? patrolOrigin : (Vector2)transform.position;
+        
+        Gizmos.color = Color.white;
+        Vector3 leftLimit = new Vector3(center.x - patrolDistance, center.y, 0);
+        Vector3 rightLimit = new Vector3(center.x + patrolDistance, center.y, 0);
+
+        Gizmos.DrawLine(leftLimit, rightLimit);
+        
+        // Desenha "travões" nas pontas da linha de patrulha
+        Gizmos.DrawLine(leftLimit + Vector3.up * 0.5f, leftLimit + Vector3.down * 0.5f);
+        Gizmos.DrawLine(rightLimit + Vector3.up * 0.5f, rightLimit + Vector3.down * 0.5f);
+
+        // 4. Raycast de Chão e Parede (Linhas Verdes)
+        if (groundCheckPoint != null)
         {
-            Gizmos.color = CanSeePlayer() ? Color.green : Color.red;
-            Gizmos.DrawLine(transform.position, playerTarget.position);
+            Gizmos.color = Color.green;
+            Gizmos.DrawRay(groundCheckPoint.position, Vector2.down * edgeCheckDistance);
+            Gizmos.DrawRay(transform.position, new Vector2(direction, 0) * wallCheckDistancePatrol);
         }
     }
 }

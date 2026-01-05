@@ -213,6 +213,7 @@ MonoBehaviour:
   sprintSpeed: 8
   jumpForce: 6
   maxJumps: 2
+  jumpVFXPrefab: {fileID: 9081207694187098227, guid: a14c85ec1b7dde140924e194f58c2f0b, type: 3}
   groundCheck: {fileID: 6785350556649017207}
   groundCheckRadius: 0.1
   groundLayer:
@@ -320,7 +321,6 @@ MonoBehaviour:
   movement: {fileID: 2584163000363952506}
   camara: {fileID: 2230336388305368168}
   combat: {fileID: 3548697139772030856}
-  nickname: 
   nicknameText: {fileID: 6320472677972034373}
 --- !u!114 &5797720257916456991
 MonoBehaviour:
@@ -741,7 +741,7 @@ Transform:
   m_GameObject: {fileID: 2480449986994863222}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: -0.178, z: 0}
+  m_LocalPosition: {x: 0, y: -0.185, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

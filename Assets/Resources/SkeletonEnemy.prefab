@@ -229,12 +229,15 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   currentState: 0
-  chaseRange: 10
+  chaseRange: 6
   attackRange: 2
-  moveSpeed: 6
-  jumpForce: 10
+  jumpForce: 8
+  patrolSpeed: 2
+  chaseSpeed: 3.5
+  patrolDistance: 3
+  waitTimeAtPoints: 1.5
   cellSize: 0.5
-  maxSearchSteps: 200
+  maxSearchSteps: 300
   pathUpdateRate: 0.25
   obstacleLayer:
     serializedVersion: 2
@@ -286,7 +289,7 @@ Transform:
   m_GameObject: {fileID: 2480449986994863222}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.007, y: -0.163, z: 0}
+  m_LocalPosition: {x: 0, y: -0.163, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -317,7 +320,7 @@ Transform:
   m_GameObject: {fileID: 6266469831547744066}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.119, y: 0, z: 0}
+  m_LocalPosition: {x: 0.1, y: 0, z: 0}
   m_LocalScale: {x: 2.09, y: 2.09, z: 2.09}
   m_ConstrainProportionsScale: 0
   m_Children: []

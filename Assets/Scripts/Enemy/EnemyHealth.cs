@@ -3,7 +3,6 @@ using Photon.Pun;
 using System.Collections;
 
 [RequireComponent(typeof(PhotonView))]
-// Removemos o RequireComponent do EnemyAI específico para evitar erros
 public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallback
 {
     [Header("Vida")]
@@ -16,22 +15,19 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
     private float originalHealthBarScaleX;
 
     private PhotonView photonView;
-    
-    // MUDANÇA: Agora usamos a classe "Pai"
     private EnemyBase enemyBase; 
-
     private int mySpawnIndex = -1;
 
     void Awake()
     {
         photonView = GetComponent<PhotonView>();
         
-        // MUDANÇA: Ele vai encontrar QUALQUER script que herde de EnemyBase (Seja o Simples ou o BFS)
+        // Encontra qualquer script que herde de EnemyBase (EnemyAI ou EnemyAI_BFS)
         enemyBase = GetComponent<EnemyBase>(); 
 
         if (enemyBase == null)
         {
-            Debug.LogError("[EnemyHealth] Erro: Nenhum script de IA (EnemyAI ou EnemyAI_BFS) encontrado neste objeto!");
+            Debug.LogError("[EnemyHealth] Erro: Nenhum script de IA encontrado neste objeto!");
         }
 
         currentHealth = maxHealth;
@@ -39,6 +35,7 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
 
     public void OnPhotonInstantiate(PhotonMessageInfo info)
     {
+        // Recupera o índice de spawn enviado pelo RoomManager na criação
         if (info.photonView.InstantiationData != null && info.photonView.InstantiationData.Length > 0)
         {
             this.mySpawnIndex = (int)info.photonView.InstantiationData[0];
@@ -54,6 +51,24 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
         }
     }
 
+    // --- NOVO: VERIFICAÇÃO DE QUEDA DA ARENA ---
+    void Update()
+    {
+        // Apenas o Master Client tem autoridade para matar inimigos por queda
+        if (PhotonNetwork.IsMasterClient && !isDead)
+        {
+            if (EnemyArenaConfig.instance != null)
+            {
+                // Se o inimigo cair abaixo do limite Y definido na Arena
+                if (transform.position.y < EnemyArenaConfig.instance.minY)
+                {
+                    Debug.Log($"[EnemyHealth] {gameObject.name} morreu por queda (Limite: {EnemyArenaConfig.instance.minY})");
+                    Die(-1); // -1 significa que não houve um atacante direto
+                }
+            }
+        }
+    }
+
     [PunRPC]
     public void TakeDamage(int _damage, int attackerViewID = -1)
     {
@@ -62,7 +77,7 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
         currentHealth -= _damage;
         UpdateHealthBar();
 
-        // --- LÓGICA DE KNOCKBACK E STUN ---
+        // Lógica de Knockback (Processada no Master Client)
         if (currentHealth > 0 && PhotonNetwork.IsMasterClient && enemyBase != null)
         {
             PhotonView attackerView = PhotonView.Find(attackerViewID);
@@ -71,13 +86,11 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
             {
                 Vector2 knockbackDirection = (transform.position - attackerView.transform.position).normalized;
 
-                // MUDANÇA: Usamos o enemyBase para aceder aos valores e chamar o RPC
-                // Nota: "ApplyKnockbackRPC" é o nome da função definida no EnemyBase
+                // Chama o RPC de Knockback definido no EnemyBase
                 photonView.RPC("ApplyKnockbackRPC", RpcTarget.MasterClient,
                                 knockbackDirection, enemyBase.KnockbackForce, enemyBase.StunTime);
             }
         }
-        // ------------------------------------
 
         if (currentHealth <= 0)
         {
@@ -87,11 +100,13 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
 
     void Die(int attackerViewID)
     {
+        if (isDead) return;
         isDead = true;
 
-        // MUDANÇA: Desativar o componente base desativa qualquer IA que esteja a ser usada
+        // Desativa a IA (EnemyAI ou EnemyAI_BFS)
         if (enemyBase != null) enemyBase.enabled = false;
 
+        // Para a física
         Rigidbody2D rb = GetComponent<Rigidbody2D>();
         if (rb != null)
         {
@@ -99,6 +114,7 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
             rb.isKinematic = true;
         }
 
+        // Se houve um atacante, avisa o sistema de combate dele que matou alguém
         if (attackerViewID != -1)
         {
             PhotonView attackerView = PhotonView.Find(attackerViewID);
@@ -108,6 +124,7 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
             }
         }
 
+        // O Master Client inicia o processo de destruição e respawn
         if (PhotonNetwork.IsMasterClient)
         {
             StartCoroutine(DestroyAfterDelay(1.0f));
@@ -128,12 +145,16 @@ public class EnemyHealth : MonoBehaviourPunCallbacks, IPunInstantiateMagicCallba
     IEnumerator DestroyAfterDelay(float delay)
     {
         yield return new WaitForSeconds(delay);
+        
         if (PhotonNetwork.IsMasterClient)
         {
-            if (TGRoomManager.instance != null)
+            // Avisa o RoomManager para colocar este spawn index na fila de renascimento
+            if (TGRoomManager.instance != null && mySpawnIndex != -1)
             {
                 TGRoomManager.instance.RequestEnemyRespawn(mySpawnIndex);
             }
+            
+            // Remove o objeto da rede Photon
             PhotonNetwork.Destroy(gameObject);
         }
     }
